@@ -70,7 +70,6 @@ struct ImageBuf {
                void* progress_callback_data) const -> bool;
 
     auto operator=(const OIIO::ImageBuf& src) -> const OIIO::ImageBuf&;
-    auto operator=(OIIO::ImageBuf&& src) -> const OIIO::ImageBuf&;
 
     auto copy_metadata(const OIIO::ImageBuf& src) -> void;
     auto copy_pixels(const OIIO::ImageBuf& src) -> bool;

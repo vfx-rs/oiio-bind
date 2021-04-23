@@ -11,6 +11,7 @@ template <class T, int StrideUnits> struct strided_ptr {
     using BoundType = OIIO::strided_ptr<T, StrideUnits>;
 
     strided_ptr<T, StrideUnits>(T* ptr, long stride);
+    ~strided_ptr();
 
     CPPMM_RENAME(copy)
     strided_ptr<T, StrideUnits>(const OIIO::strided_ptr<T, StrideUnits>& p);

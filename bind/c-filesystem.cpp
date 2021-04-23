@@ -182,8 +182,10 @@ struct IOFile {
     auto opened() const -> bool;
     auto tell() -> long;
     auto seek(long offset) -> bool;
+    auto seek(long offset, int origin) -> bool;
     auto read(void* buf, unsigned long size) -> unsigned long;
     auto write(const void* buf, unsigned long size) -> unsigned long;
+    auto write(OIIO::string_view buf) -> unsigned long;
     auto pread(void* buf, unsigned long size, long offset) -> unsigned long;
     auto pwrite(const void* buf, unsigned long size, long offset)
         -> unsigned long;
@@ -227,6 +229,7 @@ struct IOVecOutput {
     auto seek(long offset) -> bool;
     auto read(void* buf, unsigned long size) -> unsigned long;
     auto write(const void* buf, unsigned long size) -> unsigned long;
+    auto write(OIIO::string_view buf) -> unsigned long;
     auto pread(void* buf, unsigned long size, long offset) -> unsigned long;
     auto pwrite(const void* buf, unsigned long size, long offset)
         -> unsigned long;
@@ -254,9 +257,6 @@ struct IOVecOutput {
     auto operator=(const OIIO::Filesystem::IOVecOutput& rhs)
         -> OIIO::Filesystem::IOVecOutput&;
 
-    CPPMM_IGNORE
-    auto operator=(OIIO::Filesystem::IOVecOutput &&)
-        -> OIIO::Filesystem::IOVecOutput&;
     ~IOVecOutput();
 } CPPMM_OPAQUEBYTES; // struct IOVecOutput
 
@@ -268,8 +268,10 @@ struct IOMemReader {
     auto opened() const -> bool;
     auto tell() -> long;
     auto seek(long offset) -> bool;
+    auto seek(long offset, int origin) -> bool;
     auto read(void* buf, unsigned long size) -> unsigned long;
     auto write(const void* buf, unsigned long size) -> unsigned long;
+    auto write(OIIO::string_view buf) -> unsigned long;
     auto pread(void* buf, unsigned long size, long offset) -> unsigned long;
     auto pwrite(const void* buf, unsigned long size, long offset)
         -> unsigned long;
@@ -297,9 +299,6 @@ struct IOMemReader {
     auto operator=(const OIIO::Filesystem::IOMemReader& rhs)
         -> OIIO::Filesystem::IOMemReader&;
 
-    CPPMM_IGNORE
-    auto operator=(OIIO::Filesystem::IOMemReader &&)
-        -> OIIO::Filesystem::IOMemReader&;
     ~IOMemReader();
 } CPPMM_OPAQUEBYTES; // struct IOMemReader
 

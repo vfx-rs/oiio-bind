@@ -18,7 +18,7 @@ public:
     pair(const ::std::pair<First, Second>& rhs);
     ~pair();
 
-} CPPMM_OPAQUEBYTES;
+} CPPMM_OPAQUEBYTES CPPMM_IGNORE_UNBOUND;
 
 // explicit instantiation
 template class pair<OIIO::string_view, int>;

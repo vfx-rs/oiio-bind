@@ -18,7 +18,7 @@ public:
 
     ~unique_ptr() CPPMM_RENAME(dtor);
 
-} CPPMM_OPAQUEBYTES;
+} CPPMM_OPAQUEBYTES CPPMM_IGNORE_UNBOUND;
 
 // explicit instantiation
 template class unique_ptr<OIIO::ImageInput>;

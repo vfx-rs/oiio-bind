@@ -126,8 +126,6 @@ struct ImageSpec {
     CPPMM_IGNORE
     ImageSpec(OIIO::ImageSpec&&);
 
-    CPPMM_IGNORE
-    auto operator=(OIIO::ImageSpec &&) -> OIIO::ImageSpec&;
     ~ImageSpec();
 
     auto operator=(const OIIO::ImageSpec& rhs) -> OIIO::ImageSpec&;
@@ -146,6 +144,8 @@ struct ImageSpec {
 
 struct ImageInput {
     using BoundType = OIIO::ImageInput;
+
+    CPPMM_COPY(OIIO, ImageInput);
 
     static auto open(const std::string& filename, const OIIO::ImageSpec* config,
                      OIIO::Filesystem::IOProxy* ioproxy)
@@ -269,10 +269,16 @@ struct ImageInput {
     auto lock() -> void;
     auto try_lock() -> bool;
     auto unlock() -> void;
+
+    static void* operator new(unsigned long size) CPPMM_IGNORE;
+    static void operator delete(void*)CPPMM_IGNORE;
+
 } CPPMM_OPAQUEPTR; // struct ImageInput
 
 struct ImageOutput {
     using BoundType = OIIO::ImageOutput;
+
+    CPPMM_COPY(OIIO, ImageOutput);
 
     static auto create(OIIO::string_view filename,
                        OIIO::Filesystem::IOProxy* ioproxy,
@@ -335,6 +341,10 @@ struct ImageOutput {
         AppendSubimage = 1,
         AppendMIPLevel = 2,
     };
+
+    static void* operator new(unsigned long size) CPPMM_IGNORE;
+    static void operator delete(void*)CPPMM_IGNORE;
+
 } CPPMM_OPAQUEPTR; // struct ImageOutput
 
 auto openimageio_version() -> int;

@@ -46,8 +46,6 @@ struct ParamValue {
         -> void;
     auto operator=(const OIIO::ParamValue& p) -> const OIIO::ParamValue&;
 
-    CPPMM_IGNORE
-    auto operator=(OIIO::ParamValue&& p) -> const OIIO::ParamValue&;
     auto name() const -> const OIIO::ustring&;
     auto uname() const -> const OIIO::ustring&;
     auto type() const -> OIIO::TypeDesc;
@@ -174,10 +172,8 @@ struct ParamValueList {
     CPPMM_IGNORE
     ParamValueList(OIIO::ParamValueList&&);
 
-    CPPMM_IGNORE
-    auto operator=(OIIO::ParamValueList &&) -> OIIO::ParamValueList&;
     ~ParamValueList();
-} CPPMM_OPAQUEBYTES; // struct ParamValueList
+} CPPMM_OPAQUEBYTES CPPMM_IGNORE_UNBOUND; // struct ParamValueList
 
 } // namespace OIIO_NAMESPACE
 

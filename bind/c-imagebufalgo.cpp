@@ -51,8 +51,6 @@ struct Image_or_Const {
     CPPMM_IGNORE
     Image_or_Const(OIIO::Image_or_Const&&);
 
-    CPPMM_IGNORE
-    auto operator=(OIIO::Image_or_Const &&) -> OIIO::Image_or_Const&;
     ~Image_or_Const();
 
     struct None {

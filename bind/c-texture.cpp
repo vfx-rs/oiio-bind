@@ -90,8 +90,6 @@ struct TextureOptions {
     CPPMM_IGNORE
     TextureOptions(OIIO::TextureOptions&&);
 
-    CPPMM_IGNORE
-    auto operator=(OIIO::TextureOptions &&) -> OIIO::TextureOptions&;
     ~TextureOptions();
 
     enum Wrap {
@@ -137,8 +135,6 @@ struct TextureOpt {
     CPPMM_IGNORE
     TextureOpt(OIIO::TextureOpt&&);
 
-    CPPMM_IGNORE
-    auto operator=(OIIO::TextureOpt &&) -> OIIO::TextureOpt&;
     ~TextureOpt();
 
     enum Wrap {
@@ -176,13 +172,13 @@ struct TextureOptBatch {
 
     CPPMM_IGNORE
     TextureOptBatch(OIIO::TextureOptBatch&&);
-    CPPMM_IGNORE
-    auto operator=(OIIO::TextureOptBatch &&) -> OIIO::TextureOptBatch&;
     ~TextureOptBatch();
 } CPPMM_OPAQUEBYTES; // struct TextureOptBatch
 
 struct TextureSystem {
     using BoundType = OIIO::TextureSystem;
+
+    OIIO::TextureSystem& operator=(const OIIO::TextureSystem&);
 
     static auto create(bool shared, OIIO::ImageCache* imagecache)
         -> OIIO::TextureSystem*;

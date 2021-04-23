@@ -23,7 +23,7 @@ public:
     vector() CPPMM_RENAME(ctor);
     ~vector() CPPMM_RENAME(dtor);
 
-} CPPMM_OPAQUEBYTES;
+} CPPMM_OPAQUEBYTES CPPMM_IGNORE_UNBOUND;
 
 // explicit instantiation
 template class vector<::std::string>;
