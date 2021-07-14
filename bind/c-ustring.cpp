@@ -10,7 +10,8 @@ namespace OIIO = ::OIIO_NAMESPACE;
 struct ustring {
     using BoundType = OIIO::ustring;
 
-    ustring();
+    ustring() CPPMM_IGNORE;
+
     ustring(const char* str);
 
     CPPMM_IGNORE
@@ -230,7 +231,16 @@ struct ustring {
     CPPMM_IGNORE
     static auto from_unique(const char* unique) -> OIIO::ustring;
 
-} CPPMM_OPAQUEBYTES; // struct ustring
+    /// Return the total number of ustrings in the internal table.
+    static size_t total_ustrings();
+
+    /// Return the total number ustrings that have the exact hash as another
+    /// ustring. If `collisions` is passed, store all the colliding ustrings
+    /// in the vector.
+    static size_t hash_collisions(std::vector<OIIO::ustring>* collisions);
+
+} CPPMM_OPAQUEBYTES CPPMM_TRIVIALLY_MOVABLE
+    CPPMM_TRIVIALLY_COPYABLE; // struct ustring
 
 CPPMM_IGNORE
 auto iequals(OIIO::ustring a, OIIO::ustring b) -> bool;

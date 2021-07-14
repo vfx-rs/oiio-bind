@@ -1,4 +1,4 @@
-#include <OpenEXR/ImathVec.h>
+#include <Imath/ImathVec.h>
 
 #include <vector>
 
@@ -12,7 +12,7 @@ namespace IMATH_INTERNAL_NAMESPACE {
 namespace Imath = ::IMATH_INTERNAL_NAMESPACE;
 
 /// Enum for the Vec4 to Vec3 conversion constructor
-enum InfException {};
+enum IMATH_EXPORT_ENUM InfException { INF_EXCEPTION };
 
 template <class T> class Vec2 {
 public:
@@ -22,11 +22,11 @@ public:
     T& operator[](int i) CPPMM_RENAME(index);
     const T& operator[](int i) const CPPMM_RENAME(index_const);
 
-    Vec2() CPPMM_IGNORE;                        // no initialization
+    Vec2() CPPMM_RENAME(default);               // no initialization
     explicit Vec2(T a) CPPMM_RENAME(broadcast); // (a a)
     Vec2(T a, T b);                             // (a b)
 
-    Vec2(const Imath::Vec2<T>& v);
+    Vec2(const Imath::Vec2<T>& v) CPPMM_RENAME(copy);
     const Imath::Vec2<T>& operator=(const Imath::Vec2<T>& v);
 
     template <class S> Vec2(const Imath::Vec2<S>& v) CPPMM_IGNORE;
@@ -114,7 +114,7 @@ public:
     // Component-wise multiplication by -1
     //------------------------------------
 
-    Imath::Vec2<T> operator-() const;
+    Imath::Vec2<T> operator-() const CPPMM_RENAME(op_neg);
     const Imath::Vec2<T>& negate();
 
     //------------------------------
@@ -122,18 +122,18 @@ public:
     //------------------------------
 
     const Imath::Vec2<T>& operator*=(const Imath::Vec2<T>& v);
-    const Imath::Vec2<T>& operator*=(T a);
+    const Imath::Vec2<T>& operator*=(T a) CPPMM_RENAME(op_mul_assign_scalar);
     Imath::Vec2<T> operator*(const Imath::Vec2<T>& v) const;
-    Imath::Vec2<T> operator*(T a) const;
+    Imath::Vec2<T> operator*(T a) const CPPMM_RENAME(op_mul_scalar);
 
     //------------------------
     // Component-wise division
     //------------------------
 
     const Imath::Vec2<T>& operator/=(const Imath::Vec2<T>& v);
-    const Imath::Vec2<T>& operator/=(T a);
+    const Imath::Vec2<T>& operator/=(T a) CPPMM_RENAME(op_div_assign_scalar);
     Imath::Vec2<T> operator/(const Imath::Vec2<T>& v) const;
-    Imath::Vec2<T> operator/(T a) const;
+    Imath::Vec2<T> operator/(T a) const CPPMM_RENAME(op_div_scalar);
 
     //----------------------------------------------------------------
     // Length and normalization:  If v.length() is 0.0, v.normalize()
@@ -144,16 +144,16 @@ public:
     // is 0.0, the result is undefined.
     //----------------------------------------------------------------
 
-    T length() const;
-    T length2() const;
+    T length() const noexcept;
+    T length2() const noexcept;
 
-    const Imath::Vec2<T>& normalize(); // modifies *this
+    const Imath::Vec2<T>& normalize() noexcept; // modifies *this
     const Imath::Vec2<T>& normalizeExc();
-    const Imath::Vec2<T>& normalizeNonNull();
+    const Imath::Vec2<T>& normalizeNonNull() noexcept;
 
-    Imath::Vec2<T> normalized() const; // does not modify *this
+    Imath::Vec2<T> normalized() const noexcept; // does not modify *this
     Imath::Vec2<T> normalizedExc() const;
-    Imath::Vec2<T> normalizedNonNull() const;
+    Imath::Vec2<T> normalizedNonNull() const noexcept;
 
     //--------------------------------------------------------
     // Number of dimensions, i.e. number of elements in a Vec2
@@ -165,20 +165,23 @@ public:
     // Limitations of type T (see also class limits<T>)
     //-------------------------------------------------
 
-    static T baseTypeMin();
+    static T baseTypeLowest();
     static T baseTypeMax();
     static T baseTypeSmallest();
     static T baseTypeEpsilon();
 
-} CPPMM_VALUETYPE;
+} CPPMM_VALUETYPE CPPMM_TRIVIALLY_COPYABLE CPPMM_TRIVIALLY_MOVABLE;
 
 // explicit instantiation
 template class Vec2<short>;
 template class Vec2<int>;
+template class Vec2<int64_t>;
 template class Vec2<float>;
 template class Vec2<double>;
+
 using V2s = Imath::V2s;
 using V2i = Imath::V2i;
+using V2i64 = Imath::V2i64;
 using V2f = Imath::V2f;
 using V2d = Imath::V2d;
 
@@ -187,8 +190,8 @@ public:
     // This allows us to see through to the type in Imath
     using BoundType = Imath::Vec3<T>;
 
-    Vec3() noexcept;
-    Vec3(const ::Imath::Vec3<T>& v);
+    Vec3() noexcept CPPMM_RENAME(default);
+    Vec3(const ::Imath::Vec3<T>& v) CPPMM_RENAME(copy);
     const Imath::Vec3<T>& operator=(const Imath::Vec3<T>& v);
 
     T& operator[](int i) noexcept CPPMM_RENAME(index);
@@ -200,24 +203,27 @@ public:
     ///	@name Constructors and Assignment
 
     /// Initialize to a scalar `(a,a,a)`
-    constexpr explicit Vec3(T a) noexcept;
+    IMATH_HOSTDEVICE constexpr explicit Vec3(T a) noexcept
+        CPPMM_RENAME(broadcast);
 
     /// Initialize to given elements `(a,b,c)`
-    constexpr Vec3(T a, T b, T c) noexcept;
+    IMATH_HOSTDEVICE constexpr Vec3(T a, T b, T c) noexcept;
 
     /// Construct from Vec3 of another base type
-    template <class S> constexpr Vec3(const Imath::Vec3<S>& v) noexcept;
+    template <class S>
+    IMATH_HOSTDEVICE constexpr Vec3(const Imath::Vec3<S>& v) noexcept;
 
     /// Vec4 to Vec3 conversion: divide x, y and z by w, even if w is
     /// 0.  The result depends on how the environment handles
     /// floating-point exceptions.
     template <class S>
-    explicit constexpr Vec3(const Imath::Vec4<S>& v) noexcept;
+    IMATH_HOSTDEVICE explicit constexpr Vec3(const Imath::Vec4<S>& v) noexcept;
 
     /// Vec4 to Vec3 conversion: divide x, y and z by w.  Throws an
     /// exception if w is zero or if division by w would overflow.
     template <class S>
-    explicit Vec3(const Imath::Vec4<S>& v, Imath::InfException);
+    explicit IMATH_CONSTEXPR14 Vec3(const Imath::Vec4<S>& v,
+                                    Imath::InfException);
 
     /// Destructor
     ~Vec3() noexcept = default;
@@ -228,22 +234,29 @@ public:
     /// @name Compatibility with Sb
 
     /// Set the value
-    template <class S> void setValue(S a, S b, S c) noexcept;
+    template <class S>
+    IMATH_HOSTDEVICE void setValue(S a, S b, S c) noexcept CPPMM_IGNORE;
 
     /// Set the value
-    template <class S> void setValue(const Imath::Vec3<S>& v) noexcept;
+    template <class S>
+    IMATH_HOSTDEVICE void
+    setValue(const Imath::Vec3<S>& v) noexcept CPPMM_IGNORE;
 
     /// Return the value in `a`, `b`, and `c`
-    template <class S> void getValue(S& a, S& b, S& c) const noexcept;
+    template <class S>
+    IMATH_HOSTDEVICE void getValue(S& a, S& b,
+                                   S& c) const noexcept CPPMM_IGNORE;
 
     /// Return the value in `v`
-    template <class S> void getValue(Imath::Vec3<S>& v) const noexcept;
+    template <class S>
+    IMATH_HOSTDEVICE void
+    getValue(Imath::Vec3<S>& v) const noexcept CPPMM_IGNORE;
 
     /// Return a raw pointer to the array of values
-    T* getValue() noexcept;
+    IMATH_HOSTDEVICE T* getValue() noexcept CPPMM_IGNORE;
 
     /// Return a raw pointer to the array of values
-    const T* getValue() const noexcept;
+    IMATH_HOSTDEVICE const T* getValue() const noexcept CPPMM_IGNORE;
 
     /// @}
 
@@ -252,84 +265,103 @@ public:
 
     /// Equality
     template <class S>
-    constexpr bool operator==(const Imath::Vec3<S>& v) const noexcept;
+    IMATH_HOSTDEVICE constexpr bool
+    operator==(const Imath::Vec3<S>& v) const noexcept;
 
     /// Inequality
     template <class S>
-    constexpr bool operator!=(const Imath::Vec3<S>& v) const noexcept;
+    IMATH_HOSTDEVICE constexpr bool
+    operator!=(const Imath::Vec3<S>& v) const noexcept;
 
     /// Compare two matrices and test if they are "approximately equal":
     /// @return True if the coefficients of this and `m` are the same
     /// with an absolute error of no more than e, i.e., for all i, j:
     ///
     ///   abs (this[i][j] - m[i][j]) <= e
-    bool equalWithAbsError(const Imath::Vec3<T>& v, T e) const noexcept;
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 bool
+    equalWithAbsError(const Imath::Vec3<T>& v, T e) const noexcept;
 
     /// Compare two matrices and test if they are "approximately equal":
     /// @return True if the coefficients of this and m are the same with
     /// a relative error of no more than e, i.e., for all i, j:
     ///
     ///   abs (this[i] - v[i][j]) <= e * abs (this[i][j])
-    bool equalWithRelError(const Imath::Vec3<T>& v, T e) const noexcept;
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 bool
+    equalWithRelError(const Imath::Vec3<T>& v, T e) const noexcept;
 
     /// Dot product
-    constexpr T dot(const Imath::Vec3<T>& v) const noexcept;
+    IMATH_HOSTDEVICE constexpr T dot(const Imath::Vec3<T>& v) const noexcept;
 
     /// Dot product
-    constexpr T operator^(const Imath::Vec3<T>& v) const noexcept CPPMM_IGNORE;
+    IMATH_HOSTDEVICE constexpr T
+    operator^(const Imath::Vec3<T>& v) const noexcept CPPMM_IGNORE;
 
     /// Right-handed cross product
-    constexpr Imath::Vec3<T> cross(const Imath::Vec3<T>& v) const noexcept;
+    IMATH_HOSTDEVICE constexpr Imath::Vec3<T>
+    cross(const Imath::Vec3<T>& v) const noexcept;
 
     /// Right-handed cross product
-    const Imath::Vec3<T>&
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 const Imath::Vec3<T>&
     operator%=(const Imath::Vec3<T>& v) noexcept CPPMM_IGNORE;
 
     /// Right-handed cross product
-    constexpr Imath::Vec3<T>
+    IMATH_HOSTDEVICE constexpr Imath::Vec3<T>
     operator%(const Imath::Vec3<T>& v) const noexcept CPPMM_IGNORE;
 
     /// Component-wise addition
-    const Imath::Vec3<T>& operator+=(const Imath::Vec3<T>& v) noexcept;
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 const Imath::Vec3<T>&
+    operator+=(const Imath::Vec3<T>& v) noexcept;
 
     /// Component-wise addition
-    constexpr Imath::Vec3<T> operator+(const Imath::Vec3<T>& v) const noexcept;
+    IMATH_HOSTDEVICE constexpr Imath::Vec3<T>
+    operator+(const Imath::Vec3<T>& v) const noexcept;
 
     /// Component-wise subtraction
-    const Imath::Vec3<T>& operator-=(const Imath::Vec3<T>& v) noexcept;
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 const Imath::Vec3<T>&
+    operator-=(const Imath::Vec3<T>& v) noexcept;
 
     /// Component-wise subtraction
-    constexpr Imath::Vec3<T> operator-(const Imath::Vec3<T>& v) const noexcept;
+    IMATH_HOSTDEVICE constexpr Imath::Vec3<T>
+    operator-(const Imath::Vec3<T>& v) const noexcept;
 
     /// Component-wise multiplication by -1
-    constexpr Imath::Vec3<T> operator-() const noexcept;
+    IMATH_HOSTDEVICE constexpr Imath::Vec3<T> operator-() const noexcept
+        CPPMM_RENAME(op_neg);
 
     /// Component-wise multiplication by -1
-    const Imath::Vec3<T>& negate() noexcept;
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 const Imath::Vec3<T>& negate() noexcept;
 
     /// Component-wise multiplication
-    const Imath::Vec3<T>& operator*=(const Imath::Vec3<T>& v) noexcept;
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 const Imath::Vec3<T>&
+    operator*=(const Imath::Vec3<T>& v) noexcept;
 
     /// Component-wise multiplication
-    const Imath::Vec3<T>& operator*=(T a) noexcept;
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 const Imath::Vec3<T>&
+    operator*=(T a) noexcept CPPMM_RENAME(op_mul_assign_scalar);
 
     /// Component-wise multiplication
-    constexpr Imath::Vec3<T> operator*(const Imath::Vec3<T>& v) const noexcept;
+    IMATH_HOSTDEVICE constexpr Imath::Vec3<T>
+    operator*(const Imath::Vec3<T>& v) const noexcept;
 
     /// Component-wise multiplication
-    constexpr Imath::Vec3<T> operator*(T a) const noexcept;
+    IMATH_HOSTDEVICE constexpr Imath::Vec3<T> operator*(T a) const noexcept
+        CPPMM_RENAME(op_mul_scalar);
 
     /// Component-wise division
-    const Imath::Vec3<T>& operator/=(const Imath::Vec3<T>& v) noexcept;
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 const Imath::Vec3<T>&
+    operator/=(const Imath::Vec3<T>& v) noexcept;
 
     /// Component-wise division
-    const Imath::Vec3<T>& operator/=(T a) noexcept;
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 const Imath::Vec3<T>&
+    operator/=(T a) noexcept CPPMM_RENAME(op_div_assign_scalar);
 
     /// Component-wise division
-    constexpr Imath::Vec3<T> operator/(const Imath::Vec3<T>& v) const noexcept;
+    IMATH_HOSTDEVICE constexpr Imath::Vec3<T>
+    operator/(const Imath::Vec3<T>& v) const noexcept;
 
     /// Component-wise division
-    constexpr Imath::Vec3<T> operator/(T a) const noexcept;
+    IMATH_HOSTDEVICE constexpr Imath::Vec3<T> operator/(T a) const noexcept
+        CPPMM_RENAME(op_div_scalar);
 
     /// @}
 
@@ -337,14 +369,14 @@ public:
     /// @name Query and Manipulation
 
     /// Return the Euclidean norm
-    T length() const noexcept;
+    IMATH_HOSTDEVICE T length() const noexcept;
 
     /// Return the square of the Euclidean norm, i.e. the dot product
     /// with itself.
-    constexpr T length2() const noexcept;
+    IMATH_HOSTDEVICE constexpr T length2() const noexcept;
 
     /// Normalize in place. If length()==0, return a null vector.
-    const Imath::Vec3<T>& normalize() noexcept;
+    IMATH_HOSTDEVICE const Imath::Vec3<T>& normalize() noexcept;
 
     /// Normalize in place. If length()==0, throw an exception.
     const Imath::Vec3<T>& normalizeExc() CPPMM_IGNORE;
@@ -352,10 +384,11 @@ public:
     /// Normalize without any checks for length()==0. Slightly faster
     /// than the other normalization routines, but if v.length() is
     /// 0.0, the result is undefined.
-    const Imath::Vec3<T>& normalizeNonNull() noexcept;
+    IMATH_HOSTDEVICE const Imath::Vec3<T>& normalizeNonNull() noexcept;
 
     /// Return a normalized vector. Does not modify *this.
-    Imath::Vec3<T> normalized() const noexcept; // does not modify *this
+    IMATH_HOSTDEVICE Imath::Vec3<T>
+    normalized() const noexcept; // does not modify *this
 
     /// Return a normalized vector. Does not modify *this. Throw an
     /// exception if length()==0.
@@ -365,7 +398,7 @@ public:
     /// not check for length()==0. Slightly faster than the other
     /// normalization routines, but if v.length() is 0.0, the result
     /// is undefined.
-    Imath::Vec3<T> normalizedNonNull() const noexcept;
+    IMATH_HOSTDEVICE Imath::Vec3<T> normalizedNonNull() const noexcept;
 
     /// @}
 
@@ -373,30 +406,32 @@ public:
     /// @name Numeric Limits
 
     /// Largest possible negative value
-    constexpr static T baseTypeMin() noexcept;
+    IMATH_HOSTDEVICE constexpr static T baseTypeLowest() noexcept;
 
     /// Largest possible positive value
-    constexpr static T baseTypeMax() noexcept;
+    IMATH_HOSTDEVICE constexpr static T baseTypeMax() noexcept;
     /// Smallest possible positive value
-    constexpr static T baseTypeSmallest() noexcept;
+    IMATH_HOSTDEVICE constexpr static T baseTypeSmallest() noexcept;
 
     /// Smallest possible e for which 1+e != 1
-    constexpr static T baseTypeEpsilon() noexcept;
+    IMATH_HOSTDEVICE constexpr static T baseTypeEpsilon() noexcept;
 
     /// @}
 
     /// Return the number of dimensions, i.e. 3
-    constexpr static unsigned int dimensions() noexcept;
+    IMATH_HOSTDEVICE constexpr static unsigned int dimensions() noexcept;
 
-} CPPMM_VALUETYPE;
+} CPPMM_VALUETYPE CPPMM_TRIVIALLY_COPYABLE CPPMM_TRIVIALLY_MOVABLE;
 
 // explicit instantiation
 template class Vec3<short>;
 template class Vec3<int>;
+template class Vec3<int64_t>;
 template class Vec3<float>;
 template class Vec3<double>;
 using V3s = Imath::V3s;
 using V3i = Imath::V3i;
+using V3i64 = Imath::V3i64;
 using V3f = Imath::V3f;
 using V3d = Imath::V3d;
 
@@ -405,34 +440,39 @@ public:
     // This allows us to see through to the type in Imath
     using BoundType = Imath::Vec4<T>;
 
-    Vec4(const ::Imath::Vec4<T>& v);
+    Vec4(const ::Imath::Vec4<T>& v) CPPMM_RENAME(copy);
     const Imath::Vec4<T>& operator=(const ::Imath::Vec4<T>& v);
 
     /// Element access by index.
-    T& operator[](int i) noexcept CPPMM_RENAME(index);
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 T& operator[](int i) noexcept
+        CPPMM_RENAME(index);
 
     /// Element access by index.
-    constexpr const T& operator[](int i) const noexcept
+    IMATH_HOSTDEVICE constexpr const T& operator[](int i) const noexcept
         CPPMM_RENAME(index_const);
 
     /// @{
     ///	@name Constructors and Assignment
 
     /// Uninitialized by default
-    Vec4() noexcept; // no initialization
+    IMATH_HOSTDEVICE Vec4() noexcept CPPMM_RENAME(default); // no initialization
 
     /// Initialize to a scalar `(a,a,a,a)`
-    constexpr explicit Vec4(T a) noexcept;
+    IMATH_HOSTDEVICE constexpr explicit Vec4(T a) noexcept
+        CPPMM_RENAME(broadcast);
 
     /// Initialize to given elements `(a,b,c,d)`
-    constexpr Vec4(T a, T b, T c, T d) noexcept;
+    IMATH_HOSTDEVICE constexpr Vec4(T a, T b, T c, T d) noexcept;
 
     /// Construct from Vec4 of another base type
-    template <class S> constexpr Vec4(const Imath::Vec4<S>& v) noexcept;
+    template <class S>
+    IMATH_HOSTDEVICE constexpr Vec4(const Imath::Vec4<S>& v) noexcept
+        CPPMM_IGNORE;
 
     /// Vec3 to Vec4 conversion, sets w to 1.
     template <class S>
-    explicit constexpr Vec4(const Imath::Vec3<S>& v) noexcept;
+    IMATH_HOSTDEVICE explicit constexpr Vec4(const Imath::Vec3<S>& v) noexcept
+        CPPMM_IGNORE;
 
     /// Destructor
     ~Vec4() noexcept = default;
@@ -444,74 +484,91 @@ public:
 
     /// Equality
     template <class S>
-    constexpr bool operator==(const Imath::Vec4<S>& v) const noexcept;
+    IMATH_HOSTDEVICE constexpr bool
+    operator==(const Imath::Vec4<S>& v) const noexcept;
 
     /// Inequality
     template <class S>
-    constexpr bool operator!=(const Imath::Vec4<S>& v) const noexcept;
+    IMATH_HOSTDEVICE constexpr bool
+    operator!=(const Imath::Vec4<S>& v) const noexcept;
 
     /// Compare two matrices and test if they are "approximately equal":
     /// @return True if the coefficients of this and `m` are the same
     /// with an absolute error of no more than e, i.e., for all i, j:
     ///
     ///   abs (this[i][j] - m[i][j]) <= e
-    bool equalWithAbsError(const Imath::Vec4<T>& v, T e) const noexcept;
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 bool
+    equalWithAbsError(const Imath::Vec4<T>& v, T e) const noexcept;
 
     /// Compare two matrices and test if they are "approximately equal":
     /// @return True if the coefficients of this and m are the same with
     /// a relative error of no more than e, i.e., for all i, j:
     ///
     ///   abs (this[i] - v[i][j]) <= e * abs (this[i][j])
-    bool equalWithRelError(const Imath::Vec4<T>& v, T e) const noexcept;
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 bool
+    equalWithRelError(const Imath::Vec4<T>& v, T e) const noexcept;
 
     /// Dot product
-    constexpr T dot(const Imath::Vec4<T>& v) const noexcept;
+    IMATH_HOSTDEVICE constexpr T dot(const Imath::Vec4<T>& v) const noexcept;
 
     /// Dot product
-    constexpr T operator^(const Imath::Vec4<T>& v) const noexcept CPPMM_IGNORE;
+    IMATH_HOSTDEVICE constexpr T
+    operator^(const Imath::Vec4<T>& v) const noexcept CPPMM_IGNORE;
 
     /// Component-wise addition
-    const Imath::Vec4<T>&
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 const Imath::Vec4<T>&
     operator+=(const Imath::Vec4<T>& v) noexcept CPPMM_IGNORE;
 
     /// Component-wise addition
-    constexpr Imath::Vec4<T> operator+(const Imath::Vec4<T>& v) const noexcept;
+    IMATH_HOSTDEVICE constexpr Imath::Vec4<T>
+    operator+(const Imath::Vec4<T>& v) const noexcept;
 
     /// Component-wise subtraction
-    const Imath::Vec4<T>& operator-=(const Imath::Vec4<T>& v) noexcept;
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 const Imath::Vec4<T>&
+    operator-=(const Imath::Vec4<T>& v) noexcept;
 
     /// Component-wise subtraction
-    constexpr Imath::Vec4<T> operator-(const Imath::Vec4<T>& v) const noexcept;
+    IMATH_HOSTDEVICE constexpr Imath::Vec4<T>
+    operator-(const Imath::Vec4<T>& v) const noexcept;
 
     /// Component-wise multiplication by -1
-    constexpr Imath::Vec4<T> operator-() const noexcept;
+    IMATH_HOSTDEVICE constexpr Imath::Vec4<T> operator-() const noexcept
+        CPPMM_RENAME(op_neg);
 
     /// Component-wise multiplication by -1
-    const Imath::Vec4<T>& negate() noexcept;
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 const Imath::Vec4<T>& negate() noexcept;
 
     /// Component-wise multiplication
-    const Imath::Vec4<T>& operator*=(const Imath::Vec4<T>& v) noexcept;
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 const Imath::Vec4<T>&
+    operator*=(const Imath::Vec4<T>& v) noexcept;
 
     /// Component-wise multiplication
-    const Imath::Vec4<T>& operator*=(T a) noexcept;
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 const Imath::Vec4<T>&
+    operator*=(T a) noexcept CPPMM_RENAME(op_mul_assign_scalar);
 
     /// Component-wise multiplication
-    constexpr Imath::Vec4<T> operator*(const Imath::Vec4<T>& v) const noexcept;
+    IMATH_HOSTDEVICE constexpr Imath::Vec4<T>
+    operator*(const Imath::Vec4<T>& v) const noexcept;
 
     /// Component-wise multiplication
-    constexpr Imath::Vec4<T> operator*(T a) const noexcept;
+    IMATH_HOSTDEVICE constexpr Imath::Vec4<T> operator*(T a) const noexcept
+        CPPMM_RENAME(op_mul_scalar);
 
     /// Component-wise division
-    const Imath::Vec4<T>& operator/=(const Imath::Vec4<T>& v) noexcept;
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 const Imath::Vec4<T>&
+    operator/=(const Imath::Vec4<T>& v) noexcept;
 
     /// Component-wise division
-    const Imath::Vec4<T>& operator/=(T a) noexcept;
+    IMATH_HOSTDEVICE IMATH_CONSTEXPR14 const Imath::Vec4<T>&
+    operator/=(T a) noexcept CPPMM_RENAME(op_div_assign_scalar);
 
     /// Component-wise division
-    constexpr Imath::Vec4<T> operator/(const Imath::Vec4<T>& v) const noexcept;
+    IMATH_HOSTDEVICE constexpr Imath::Vec4<T>
+    operator/(const Imath::Vec4<T>& v) const noexcept;
 
     /// Component-wise division
-    constexpr Imath::Vec4<T> operator/(T a) const noexcept;
+    IMATH_HOSTDEVICE constexpr Imath::Vec4<T> operator/(T a) const noexcept
+        CPPMM_RENAME(op_div_scalar);
 
     /// @}
 
@@ -519,14 +576,15 @@ public:
     /// @name Query and Manipulation
 
     /// Return the Euclidean norm
-    T length() const noexcept;
+    IMATH_HOSTDEVICE T length() const noexcept;
 
     /// Return the square of the Euclidean norm, i.e. the dot product
     /// with itself.
-    constexpr T length2() const noexcept;
+    IMATH_HOSTDEVICE constexpr T length2() const noexcept;
 
     /// Normalize in place. If length()==0, return a null vector.
-    const Imath::Vec4<T>& normalize() noexcept; // modifies *this
+    IMATH_HOSTDEVICE const Imath::Vec4<T>&
+    normalize() noexcept; // modifies *this
 
     /// Normalize in place. If length()==0, throw an exception.
     const Imath::Vec4<T>& normalizeExc() CPPMM_IGNORE;
@@ -534,10 +592,11 @@ public:
     /// Normalize without any checks for length()==0. Slightly faster
     /// than the other normalization routines, but if v.length() is
     /// 0.0, the result is undefined.
-    const Imath::Vec4<T>& normalizeNonNull() noexcept;
+    IMATH_HOSTDEVICE const Imath::Vec4<T>& normalizeNonNull() noexcept;
 
     /// Return a normalized vector. Does not modify *this.
-    Imath::Vec4<T> normalized() const noexcept; // does not modify *this
+    IMATH_HOSTDEVICE Imath::Vec4<T>
+    normalized() const noexcept; // does not modify *this
 
     /// Return a normalized vector. Does not modify *this. Throw an
     /// exception if length()==0.
@@ -547,7 +606,7 @@ public:
     /// not check for length()==0. Slightly faster than the other
     /// normalization routines, but if v.length() is 0.0, the result
     /// is undefined.
-    Imath::Vec4<T> normalizedNonNull() const noexcept;
+    IMATH_HOSTDEVICE Imath::Vec4<T> normalizedNonNull() const noexcept;
 
     /// @}
 
@@ -555,32 +614,144 @@ public:
     /// @name Numeric Limits
 
     /// Largest possible negative value
-    constexpr static T baseTypeMin() noexcept;
+    IMATH_HOSTDEVICE constexpr static T baseTypeLowest() noexcept;
 
     /// Largest possible positive value
-    constexpr static T baseTypeMax() noexcept;
+    IMATH_HOSTDEVICE constexpr static T baseTypeMax() noexcept;
 
     /// Smallest possible positive value
-    constexpr static T baseTypeSmallest() noexcept;
+    IMATH_HOSTDEVICE constexpr static T baseTypeSmallest() noexcept;
 
     /// Smallest possible e for which 1+e != 1
-    constexpr static T baseTypeEpsilon() noexcept;
+    IMATH_HOSTDEVICE constexpr static T baseTypeEpsilon() noexcept;
     /// @}
 
     /// Return the number of dimensions, i.e. 4
-    constexpr static unsigned int dimensions() noexcept;
+    IMATH_HOSTDEVICE constexpr static unsigned int dimensions() noexcept;
 
-} CPPMM_VALUETYPE;
+} CPPMM_VALUETYPE CPPMM_TRIVIALLY_COPYABLE CPPMM_TRIVIALLY_MOVABLE;
 
 // explicit instantiation
 template class Vec4<short>;
 template class Vec4<int>;
+template class Vec4<int64_t>;
 template class Vec4<float>;
 template class Vec4<double>;
 using V4s = Imath::V4s;
-using V4i = Imath::V4i;
+using V4i64 = Imath::V4i64;
 using V4f = Imath::V4f;
 using V4d = Imath::V4d;
+
+// Vec2<short>
+template <> short Vec2<short>::length() const noexcept = delete;
+template <>
+const Imath::Vec2<short>& Vec2<short>::normalize() noexcept = delete;
+template <> const Imath::Vec2<short>& Vec2<short>::normalizeExc() = delete;
+template <>
+const Imath::Vec2<short>& Vec2<short>::normalizeNonNull() noexcept = delete;
+template <>
+Imath::Vec2<short> Vec2<short>::normalized() const noexcept = delete;
+template <> Imath::Vec2<short> Vec2<short>::normalizedExc() const = delete;
+template <>
+Imath::Vec2<short> Vec2<short>::normalizedNonNull() const noexcept = delete;
+
+// Vec2<int>
+template <> int Vec2<int>::length() const noexcept = delete;
+template <> const Imath::Vec2<int>& Vec2<int>::normalize() noexcept = delete;
+template <> const Imath::Vec2<int>& Vec2<int>::normalizeExc() = delete;
+template <>
+const Imath::Vec2<int>& Vec2<int>::normalizeNonNull() noexcept = delete;
+template <> Imath::Vec2<int> Vec2<int>::normalized() const noexcept = delete;
+template <> Imath::Vec2<int> Vec2<int>::normalizedExc() const = delete;
+template <>
+Imath::Vec2<int> Vec2<int>::normalizedNonNull() const noexcept = delete;
+
+// Vec2<int64_t>
+template <> int64_t Vec2<int64_t>::length() const noexcept = delete;
+template <>
+const Imath::Vec2<int64_t>& Vec2<int64_t>::normalize() noexcept = delete;
+template <> const Imath::Vec2<int64_t>& Vec2<int64_t>::normalizeExc() = delete;
+template <>
+const Imath::Vec2<int64_t>& Vec2<int64_t>::normalizeNonNull() noexcept = delete;
+template <>
+Imath::Vec2<int64_t> Vec2<int64_t>::normalized() const noexcept = delete;
+template <> Imath::Vec2<int64_t> Vec2<int64_t>::normalizedExc() const = delete;
+template <>
+Imath::Vec2<int64_t> Vec2<int64_t>::normalizedNonNull() const noexcept = delete;
+
+// Vec3<short>
+template <> short Vec3<short>::length() const noexcept = delete;
+template <>
+const Imath::Vec3<short>& Vec3<short>::normalize() noexcept = delete;
+template <> const Imath::Vec3<short>& Vec3<short>::normalizeExc() = delete;
+template <>
+const Imath::Vec3<short>& Vec3<short>::normalizeNonNull() noexcept = delete;
+template <>
+Imath::Vec3<short> Vec3<short>::normalized() const noexcept = delete;
+template <> Imath::Vec3<short> Vec3<short>::normalizedExc() const = delete;
+template <>
+Imath::Vec3<short> Vec3<short>::normalizedNonNull() const noexcept = delete;
+
+// Vec3<int>
+template <> int Vec3<int>::length() const noexcept = delete;
+template <> const Imath::Vec3<int>& Vec3<int>::normalize() noexcept = delete;
+template <> const Imath::Vec3<int>& Vec3<int>::normalizeExc() = delete;
+template <>
+const Imath::Vec3<int>& Vec3<int>::normalizeNonNull() noexcept = delete;
+template <> Imath::Vec3<int> Vec3<int>::normalized() const noexcept = delete;
+template <> Imath::Vec3<int> Vec3<int>::normalizedExc() const = delete;
+template <>
+Imath::Vec3<int> Vec3<int>::normalizedNonNull() const noexcept = delete;
+
+// Vec3<int64_t>
+template <> int64_t Vec3<int64_t>::length() const noexcept = delete;
+template <>
+const Imath::Vec3<int64_t>& Vec3<int64_t>::normalize() noexcept = delete;
+template <> const Imath::Vec3<int64_t>& Vec3<int64_t>::normalizeExc() = delete;
+template <>
+const Imath::Vec3<int64_t>& Vec3<int64_t>::normalizeNonNull() noexcept = delete;
+template <>
+Imath::Vec3<int64_t> Vec3<int64_t>::normalized() const noexcept = delete;
+template <> Imath::Vec3<int64_t> Vec3<int64_t>::normalizedExc() const = delete;
+template <>
+Imath::Vec3<int64_t> Vec3<int64_t>::normalizedNonNull() const noexcept = delete;
+
+// Vec4<short>
+template <> short Vec4<short>::length() const noexcept = delete;
+template <>
+const Imath::Vec4<short>& Vec4<short>::normalize() noexcept = delete;
+template <> const Imath::Vec4<short>& Vec4<short>::normalizeExc() = delete;
+template <>
+const Imath::Vec4<short>& Vec4<short>::normalizeNonNull() noexcept = delete;
+template <>
+Imath::Vec4<short> Vec4<short>::normalized() const noexcept = delete;
+template <> Imath::Vec4<short> Vec4<short>::normalizedExc() const = delete;
+template <>
+Imath::Vec4<short> Vec4<short>::normalizedNonNull() const noexcept = delete;
+
+// Vec4<int>
+template <> int Vec4<int>::length() const noexcept = delete;
+template <> const Imath::Vec4<int>& Vec4<int>::normalize() noexcept = delete;
+template <> const Imath::Vec4<int>& Vec4<int>::normalizeExc() = delete;
+template <>
+const Imath::Vec4<int>& Vec4<int>::normalizeNonNull() noexcept = delete;
+template <> Imath::Vec4<int> Vec4<int>::normalized() const noexcept = delete;
+template <> Imath::Vec4<int> Vec4<int>::normalizedExc() const = delete;
+template <>
+Imath::Vec4<int> Vec4<int>::normalizedNonNull() const noexcept = delete;
+
+// Vec4<int64_t>
+template <> int64_t Vec4<int64_t>::length() const noexcept = delete;
+template <>
+const Imath::Vec4<int64_t>& Vec4<int64_t>::normalize() noexcept = delete;
+template <> const Imath::Vec4<int64_t>& Vec4<int64_t>::normalizeExc() = delete;
+template <>
+const Imath::Vec4<int64_t>& Vec4<int64_t>::normalizeNonNull() noexcept = delete;
+template <>
+Imath::Vec4<int64_t> Vec4<int64_t>::normalized() const noexcept = delete;
+template <> Imath::Vec4<int64_t> Vec4<int64_t>::normalizedExc() const = delete;
+template <>
+Imath::Vec4<int64_t> Vec4<int64_t>::normalizedNonNull() const noexcept = delete;
 
 } // namespace IMATH_INTERNAL_NAMESPACE
 } // namespace cppmm_bind

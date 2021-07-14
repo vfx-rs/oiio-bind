@@ -8,6 +8,16 @@ trap 'last_command=$current_command; current_command=$BASH_COMMAND' DEBUG
 # echo an error message before exiting
 trap 'echo "\"${last_command}\" exited with code $?."' ERR
 
-astgen bind -u -v 1 -o build/ast -- -I${OIIO_ROOT}/include -I${OPENEXR_ROOT}/include
+rm -rf build
 
-asttoc build/ast -o build -p oiio -L $OIIO_ROOT/lib -l OpenImageIO -major 2 -minor 2 -patch 8
+astgen bind -u -v 2 \
+    -o build/ast \
+    -- \
+    -I${OIIO_ROOT}/include \
+    -I${OPENEXR_ROOT}/include \
+    -I${IMATH_ROOT}/include
+
+asttoc build/ast -v 3 -o build -p oiio \
+    -L $OIIO_ROOT/lib \
+    -l OpenImageIO \
+    -major 2 -minor 3 -patch 6

@@ -60,7 +60,8 @@ template <class T, int StrideUnits> struct strided_ptr {
 
     CPPMM_IGNORE
     auto operator-=(long d) -> const OIIO::strided_ptr<T, StrideUnits>&;
-} CPPMM_OPAQUEBYTES; // struct strided_ptr
+} CPPMM_OPAQUEBYTES CPPMM_TRIVIALLY_MOVABLE
+    CPPMM_TRIVIALLY_COPYABLE; // struct strided_ptr
 
 // TODO: fill in explicit instantiations, e.g.:
 template class strided_ptr<float, 1>;

@@ -12,7 +12,7 @@ using ProgressCallback = OIIO::ProgressCallback;
 struct ROI {
     using BoundType = OIIO::ROI;
 
-    ROI();
+    ROI() CPPMM_RENAME(default);
     ROI(int xbegin, int xend, int ybegin, int yend, int zbegin, int zend,
         int chbegin, int chend);
     auto defined() const -> bool;
@@ -23,6 +23,7 @@ struct ROI {
     auto npixels() const -> unsigned long;
     static auto All() -> OIIO::ROI;
     auto contains(int x, int y, int z, int ch) const -> bool;
+    CPPMM_RENAME(contains_roi)
     auto contains(const OIIO::ROI& other) const -> bool;
 
     ROI(const OIIO::ROI& rhs);
@@ -39,14 +40,22 @@ auto roi_intersection(const OIIO::ROI& A, const OIIO::ROI& B) -> OIIO::ROI;
 struct ImageSpec {
     using BoundType = OIIO::ImageSpec;
 
+    CPPMM_RENAME(from_typedesc)
     ImageSpec(OIIO::TypeDesc format);
+    CPPMM_RENAME(from_dimensions)
     ImageSpec(int xres, int yres, int nchans, OIIO::TypeDesc fmt);
+    CPPMM_RENAME(from_roi)
     ImageSpec(const OIIO::ROI& roi, OIIO::TypeDesc fmt);
+
     auto set_format(OIIO::TypeDesc fmt) -> void;
     auto default_channel_names() -> void;
     auto channel_bytes() const -> unsigned long;
+
+    CPPMM_RENAME(channel_bytes_for_channel)
     auto channel_bytes(int chan, bool native) const -> unsigned long;
     auto pixel_bytes(bool native) const -> unsigned long;
+
+    CPPMM_RENAME(pixel_bytes_for_channels)
     auto pixel_bytes(int chbegin, int chend, bool native) const
         -> unsigned long;
     auto scanline_bytes(bool native) const -> unsigned long;
@@ -55,50 +64,82 @@ struct ImageSpec {
     auto image_pixels() const -> unsigned long;
     auto image_bytes(bool native) const -> unsigned long;
     auto size_t_safe() const -> bool;
+
     static auto auto_stride(long& xstride, long& ystride, long& zstride,
                             long channelsize, int nchannels, int width,
                             int height) -> void;
+
+    CPPMM_RENAME(auto_stride_with_typedesc)
     static auto auto_stride(long& xstride, long& ystride, long& zstride,
                             OIIO::TypeDesc format, int nchannels, int width,
                             int height) -> void;
+
+    CPPMM_RENAME(auto_stride_xstride)
     static auto auto_stride(long& xstride, OIIO::TypeDesc format, int nchannels)
         -> void;
+
     auto attribute(OIIO::string_view name, OIIO::TypeDesc type,
                    const void* value) -> void;
+
+    CPPMM_RENAME(attribute_uint)
     auto attribute(OIIO::string_view name, unsigned int value) -> void;
+
+    CPPMM_RENAME(attribute_int)
     auto attribute(OIIO::string_view name, int value) -> void;
+
+    CPPMM_RENAME(attribute_float)
     auto attribute(OIIO::string_view name, float value) -> void;
+
+    CPPMM_RENAME(attribute_string)
     auto attribute(OIIO::string_view name, OIIO::string_view value) -> void;
+
+    CPPMM_RENAME(attribute_from_string)
     auto attribute(OIIO::string_view name, OIIO::TypeDesc type,
                    OIIO::string_view value) -> void;
+
     auto erase_attribute(OIIO::string_view name, OIIO::TypeDesc searchtype,
                          bool casesensitive) -> void;
+
     auto find_attribute(OIIO::string_view name, OIIO::TypeDesc searchtype,
                         bool casesensitive) -> OIIO::ParamValue*;
+
+    CPPMM_RENAME(find_attribute_const)
     auto find_attribute(OIIO::string_view name, OIIO::TypeDesc searchtype,
                         bool casesensitive) const -> const OIIO::ParamValue*;
+
+    CPPMM_RENAME(find_attribute_builtin)
     auto find_attribute(OIIO::string_view name, OIIO::ParamValue& tmpparam,
                         OIIO::TypeDesc searchtype, bool casesensitive) const
         -> const OIIO::ParamValue*;
+
     auto getattributetype(OIIO::string_view name, bool casesensitive) const
         -> OIIO::TypeDesc;
+
     auto getattribute(OIIO::string_view name, OIIO::TypeDesc type, void* value,
                       bool casesensitive) const -> bool;
+
     auto get_int_attribute(OIIO::string_view name, int defaultval) const -> int;
+
     auto get_float_attribute(OIIO::string_view name, float defaultval) const
         -> float;
+
     auto get_string_attribute(OIIO::string_view name,
                               OIIO::string_view defaultval) const
         -> OIIO::string_view;
+
     static auto metadata_val(const OIIO::ParamValue& p, bool human)
         -> std::string;
+
     auto serialize(OIIO::ImageSpec::SerialFormat format,
                    OIIO::ImageSpec::SerialVerbose verbose) const -> std::string;
+
     auto to_xml() const -> std::string;
     auto from_xml(const char* xml) -> void;
+
     auto decode_compression_metadata(OIIO::string_view defaultcomp,
                                      int defaultqual) const
         -> std::pair<OIIO::string_view, int>;
+
     auto valid_tile_range(int xbegin, int xend, int ybegin, int yend,
                           int zbegin, int zend) -> bool;
     auto channelformat(int chan) const -> OIIO::TypeDesc;
@@ -140,120 +181,185 @@ struct ImageSpec {
         SerialDetailed = 1,
         SerialDetailedHuman = 2,
     };
-} CPPMM_OPAQUEBYTES; // struct ImageSpec
+} CPPMM_OPAQUEPTR; // struct ImageSpec
 
 struct ImageInput {
     using BoundType = OIIO::ImageInput;
 
-    CPPMM_COPY(OIIO, ImageInput);
-
     static auto open(const std::string& filename, const OIIO::ImageSpec* config,
                      OIIO::Filesystem::IOProxy* ioproxy)
         -> std::unique_ptr<OIIO::ImageInput>;
+
+    CPPMM_IGNORE
     static auto create(OIIO::string_view filename, bool do_open,
                        const OIIO::ImageSpec* config,
                        OIIO::Filesystem::IOProxy* ioproxy,
                        OIIO::string_view plugin_searchpath)
         -> std::unique_ptr<OIIO::ImageInput>;
+
+    CPPMM_IGNORE
     static auto create(const std::string& filename, bool do_open,
                        const OIIO::ImageSpec* config,
                        OIIO::string_view plugin_searchpath)
         -> std::unique_ptr<OIIO::ImageInput>;
+
+    CPPMM_IGNORE
     static auto create(const std::string& filename,
                        const std::string& plugin_searchpath)
         -> std::unique_ptr<OIIO::ImageInput>;
+
+    CPPMM_IGNORE
     static auto destroy(OIIO::ImageInput* x) -> void;
+
     ~ImageInput();
+
     auto format_name() const -> const char*;
+
     auto supports(OIIO::string_view feature) const -> int;
+
     auto valid_file(const std::string& filename) const -> bool;
+
+    CPPMM_RENAME(open_in)
     auto open(const std::string& name, OIIO::ImageSpec& newspec) -> bool;
+
+    CPPMM_RENAME(open_in_with_config)
     auto open(const std::string& name, OIIO::ImageSpec& newspec,
               const OIIO::ImageSpec& config) -> bool;
+
     auto spec() const -> const OIIO::ImageSpec&;
+
+    CPPMM_RENAME(spec_for_subimage)
     auto spec(int subimage, int miplevel) -> OIIO::ImageSpec;
+
     auto spec_dimensions(int subimage, int miplevel) -> OIIO::ImageSpec;
     auto close() -> bool;
     auto current_subimage() const -> int;
     auto current_miplevel() const -> int;
+
     auto seek_subimage(int subimage, int miplevel) -> bool;
+
+    CPPMM_IGNORE
     auto seek_subimage(int subimage, int miplevel, OIIO::ImageSpec& newspec)
         -> bool;
+
+    CPPMM_IGNORE
     auto seek_subimage(int subimage, OIIO::ImageSpec& newspec) -> bool;
+
     auto read_scanline(int y, int z, OIIO::TypeDesc format, void* data,
                        long xstride) -> bool;
+
+    CPPMM_RENAME(read_scanline_contiguous)
     auto read_scanline(int y, int z, float* data) -> bool;
+
     auto read_scanlines(int subimage, int miplevel, int ybegin, int yend, int z,
                         int chbegin, int chend, OIIO::TypeDesc format,
                         void* data, long xstride, long ystride) -> bool;
+
+    CPPMM_IGNORE
     auto read_scanlines(int ybegin, int yend, int z, OIIO::TypeDesc format,
                         void* data, long xstride, long ystride) -> bool;
+
+    CPPMM_IGNORE
     auto read_scanlines(int ybegin, int yend, int z, int chbegin, int chend,
                         OIIO::TypeDesc format, void* data, long xstride,
                         long ystride) -> bool;
+
     auto read_tile(int x, int y, int z, OIIO::TypeDesc format, void* data,
                    long xstride, long ystride, long zstride) -> bool;
+
+    CPPMM_RENAME(read_tile_contiguous)
     auto read_tile(int x, int y, int z, float* data) -> bool;
+
     auto read_tiles(int subimage, int miplevel, int xbegin, int xend,
                     int ybegin, int yend, int zbegin, int zend, int chbegin,
                     int chend, OIIO::TypeDesc format, void* data, long xstride,
                     long ystride, long zstride) -> bool;
+
+    CPPMM_IGNORE
     auto read_tiles(int xbegin, int xend, int ybegin, int yend, int zbegin,
                     int zend, OIIO::TypeDesc format, void* data, long xstride,
                     long ystride, long zstride) -> bool;
+
+    CPPMM_IGNORE
     auto read_tiles(int xbegin, int xend, int ybegin, int yend, int zbegin,
                     int zend, int chbegin, int chend, OIIO::TypeDesc format,
                     void* data, long xstride, long ystride, long zstride)
         -> bool;
+
     auto read_image(int subimage, int miplevel, int chbegin, int chend,
                     OIIO::TypeDesc format, void* data, long xstride,
                     long ystride, long zstride,
                     OIIO::ProgressCallback progress_callback,
                     void* progress_callback_data) -> bool;
+
+    CPPMM_IGNORE
     auto read_image(OIIO::TypeDesc format, void* data, long xstride,
                     long ystride, long zstride,
                     OIIO::ProgressCallback progress_callback,
                     void* progress_callback_data) -> bool;
+
+    CPPMM_IGNORE
     auto read_image(int chbegin, int chend, OIIO::TypeDesc format, void* data,
                     long xstride, long ystride, long zstride,
                     OIIO::ProgressCallback progress_callback,
                     void* progress_callback_data) -> bool;
+
+    CPPMM_IGNORE
     auto read_image(float* data) -> bool;
+
     auto read_native_deep_scanlines(int subimage, int miplevel, int ybegin,
                                     int yend, int z, int chbegin, int chend,
                                     OIIO::DeepData& deepdata) -> bool;
+
     auto read_native_deep_tiles(int subimage, int miplevel, int xbegin,
                                 int xend, int ybegin, int yend, int zbegin,
                                 int zend, int chbegin, int chend,
                                 OIIO::DeepData& deepdata) -> bool;
+
     auto read_native_deep_image(int subimage, int miplevel,
                                 OIIO::DeepData& deepdata) -> bool;
+
+    CPPMM_IGNORE
     auto read_native_deep_scanlines(int ybegin, int yend, int z, int chbegin,
                                     int chend, OIIO::DeepData& deepdata)
         -> bool;
+
+    CPPMM_IGNORE
     auto read_native_deep_tiles(int xbegin, int xend, int ybegin, int yend,
                                 int zbegin, int zend, int chbegin, int chend,
                                 OIIO::DeepData& deepdata) -> bool;
+
+    CPPMM_IGNORE
     auto read_native_deep_image(OIIO::DeepData& deepdata) -> bool;
+
     auto read_native_scanline(int subimage, int miplevel, int y, int z,
                               void* data) -> bool;
+
     auto read_native_scanlines(int subimage, int miplevel, int ybegin, int yend,
                                int z, void* data) -> bool;
+
+    CPPMM_RENAME(read_native_scanlines_with_channels)
     auto read_native_scanlines(int subimage, int miplevel, int ybegin, int yend,
                                int z, int chbegin, int chend, void* data)
         -> bool;
+
     auto read_native_tile(int subimage, int miplevel, int x, int y, int z,
                           void* data) -> bool;
+
     auto read_native_tiles(int subimage, int miplevel, int xbegin, int xend,
                            int ybegin, int yend, int zbegin, int zend,
                            void* data) -> bool;
+
+    CPPMM_RENAME(read_native_tiles_with_channels)
     auto read_native_tiles(int subimage, int miplevel, int xbegin, int xend,
                            int ybegin, int yend, int zbegin, int zend,
                            int chbegin, int chend, void* data) -> bool;
+
     auto send_to_input(const char* format) -> int;
     auto send_to_client(const char* format) -> int;
     auto set_ioproxy(OIIO::Filesystem::IOProxy* ioproxy) -> bool;
-    auto geterror() const -> std::string;
+    bool has_error() const;
+    auto geterror(bool clear) const -> std::string;
 
     template <typename... Args>
     void error(const char* fmt, Args... args) const CPPMM_IGNORE;
@@ -265,10 +371,11 @@ struct ImageInput {
     void fmterror(const char* fmt, Args... args) const CPPMM_IGNORE;
 
     auto threads(int n) -> void;
+    CPPMM_RENAME(threads_const)
     auto threads() const -> int;
-    auto lock() -> void;
-    auto try_lock() -> bool;
-    auto unlock() -> void;
+    auto lock() const -> void;
+    auto try_lock() const -> bool;
+    auto unlock() const -> void;
 
     static void* operator new(unsigned long size) CPPMM_IGNORE;
     static void operator delete(void*)CPPMM_IGNORE;
@@ -278,23 +385,31 @@ struct ImageInput {
 struct ImageOutput {
     using BoundType = OIIO::ImageOutput;
 
-    CPPMM_COPY(OIIO, ImageOutput);
-
     static auto create(OIIO::string_view filename,
                        OIIO::Filesystem::IOProxy* ioproxy,
                        OIIO::string_view plugin_searchpath)
         -> std::unique_ptr<OIIO::ImageOutput>;
+
+    CPPMM_IGNORE
     static auto create(const std::string& filename,
                        const std::string& plugin_searchpath)
         -> std::unique_ptr<OIIO::ImageOutput>;
+
+    CPPMM_IGNORE
     static auto destroy(OIIO::ImageOutput* x) -> void;
+
     ~ImageOutput();
     auto format_name() const -> const char*;
     auto supports(OIIO::string_view feature) const -> int;
+
+    CPPMM_RENAME(open_in)
     auto open(const std::string& name, const OIIO::ImageSpec& newspec,
               OIIO::ImageOutput::OpenMode mode) -> bool;
+
+    CPPMM_RENAME(open_subimage_in)
     auto open(const std::string& name, int subimages,
               const OIIO::ImageSpec* specs) -> bool;
+
     auto spec() const -> const OIIO::ImageSpec&;
     auto close() -> bool;
     auto write_scanline(int y, int z, OIIO::TypeDesc format, const void* data,
@@ -324,7 +439,8 @@ struct ImageOutput {
     auto send_to_output(const char* format) -> int;
     auto send_to_client(const char* format) -> int;
     auto set_ioproxy(OIIO::Filesystem::IOProxy* ioproxy) -> bool;
-    auto geterror() const -> std::string;
+    bool has_error() const;
+    auto geterror(bool clear) const -> std::string;
     template <typename... Args>
     void error(const char* fmt, Args... args) const CPPMM_IGNORE;
     template <typename... Args>
@@ -334,6 +450,7 @@ struct ImageOutput {
     template <typename... Args>
     void fmterror(const char* fmt, Args... args) const CPPMM_IGNORE;
     auto threads(int n) -> void;
+    CPPMM_RENAME(threads_const)
     auto threads() const -> int;
 
     enum OpenMode {
@@ -354,21 +471,28 @@ auto geterror() -> std::string;
 auto attribute(OIIO::string_view name, OIIO::TypeDesc type, const void* val)
     -> bool;
 
+CPPMM_RENAME(attribute_int)
 auto attribute(OIIO::string_view name, int val) -> bool;
 
+CPPMM_RENAME(attribute_float)
 auto attribute(OIIO::string_view name, float val) -> bool;
 
+CPPMM_RENAME(attribute_string)
 auto attribute(OIIO::string_view name, OIIO::string_view val) -> bool;
 
 auto getattribute(OIIO::string_view name, OIIO::TypeDesc type, void* val)
     -> bool;
 
+CPPMM_RENAME(getattribute_int)
 auto getattribute(OIIO::string_view name, int& val) -> bool;
 
+CPPMM_RENAME(getattribute_float)
 auto getattribute(OIIO::string_view name, float& val) -> bool;
 
+CPPMM_RENAME(getattribute_string)
 auto getattribute(OIIO::string_view name, std::string& val) -> bool;
 
+CPPMM_RENAME(getattribute_cstr)
 auto getattribute(OIIO::string_view name, char** val) -> bool;
 
 auto get_int_attribute(OIIO::string_view name, int defaultval) -> int;

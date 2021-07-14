@@ -9,6 +9,12 @@ namespace cppmm_bind {
 
 namespace std {
 
+#if defined(_LIBCPP_VERSION)
+namespace std = ::std::_LIBCPP_ABI_NAMESPACE;
+#else
+namespace std = ::std;
+#endif
+
 template <class First, class Second> class pair {
 public:
     // This allows us to see through to the type in Imath
@@ -18,7 +24,7 @@ public:
     pair(const ::std::pair<First, Second>& rhs);
     ~pair();
 
-} CPPMM_OPAQUEBYTES CPPMM_IGNORE_UNBOUND;
+} CPPMM_OPAQUEPTR CPPMM_IGNORE_UNBOUND;
 
 // explicit instantiation
 template class pair<OIIO::string_view, int>;

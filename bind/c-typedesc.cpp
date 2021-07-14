@@ -49,6 +49,10 @@ struct TypeDesc {
     auto is_vec2(OIIO::TypeDesc::BASETYPE b) const -> bool;
     auto is_vec3(OIIO::TypeDesc::BASETYPE b) const -> bool;
     auto is_vec4(OIIO::TypeDesc::BASETYPE b) const -> bool;
+    constexpr bool is_box2(OIIO::TypeDesc::BASETYPE b) const noexcept;
+    /// Is this an array of aggregates that represents a 3D bounding box?
+    constexpr bool is_box3(OIIO::TypeDesc::BASETYPE b) const noexcept;
+
     auto unarray() -> void;
     auto operator<(const OIIO::TypeDesc& x) const -> bool;
     static auto basetype_merge(OIIO::TypeDesc a, OIIO::TypeDesc b)
@@ -102,7 +106,7 @@ struct TypeDesc {
         KEYCODE = 6,
         RATIONAL = 7,
     };
-} CPPMM_OPAQUEBYTES; // struct TypeDesc
+} CPPMM_VALUETYPE; // struct TypeDesc
 
 } // namespace OIIO_NAMESPACE
 

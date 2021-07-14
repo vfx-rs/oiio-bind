@@ -119,7 +119,8 @@ struct string_view {
 
     ~string_view();
 
-} CPPMM_OPAQUEBYTES; // struct string_view
+} CPPMM_OPAQUEBYTES CPPMM_TRIVIALLY_MOVABLE
+    CPPMM_TRIVIALLY_COPYABLE; // struct string_view
 
 CPPMM_IGNORE
 auto operator==(OIIO::string_view x, OIIO::string_view y) -> bool;

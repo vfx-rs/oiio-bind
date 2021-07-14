@@ -143,9 +143,11 @@ struct IOProxy {
     auto close() -> void;
     auto opened() const -> bool;
     auto tell() -> long;
+
     auto seek(long offset) -> bool;
     auto read(void* buf, unsigned long size) -> unsigned long;
     auto write(const void* buf, unsigned long size) -> unsigned long;
+
     auto pread(void* buf, unsigned long size, long offset) -> unsigned long;
     auto pwrite(const void* buf, unsigned long size, long offset)
         -> unsigned long;
@@ -155,8 +157,10 @@ struct IOProxy {
     auto filename() const -> const std::string&;
     template <typename T> auto read(OIIO::span<T, -1> buf) -> unsigned long;
     template <typename T> auto write(OIIO::span<T, -1> buf) -> unsigned long;
-    auto write(OIIO::string_view buf) -> unsigned long;
-    auto seek(long offset, int origin) -> bool;
+
+    unsigned long write(OIIO::string_view buf) CPPMM_RENAME(write_string_view);
+    bool seek(long offset, int origin) CPPMM_RENAME(seek_with_origin);
+
     auto error() const -> std::string;
 
     CPPMM_IGNORE
@@ -182,9 +186,11 @@ struct IOFile {
     auto opened() const -> bool;
     auto tell() -> long;
     auto seek(long offset) -> bool;
-    auto seek(long offset, int origin) -> bool;
+    bool seek(long offset, int origin) CPPMM_RENAME(seek_with_origin);
     auto read(void* buf, unsigned long size) -> unsigned long;
     auto write(const void* buf, unsigned long size) -> unsigned long;
+
+    CPPMM_RENAME(write_string_view)
     auto write(OIIO::string_view buf) -> unsigned long;
     auto pread(void* buf, unsigned long size, long offset) -> unsigned long;
     auto pwrite(const void* buf, unsigned long size, long offset)
@@ -211,13 +217,7 @@ struct IOFile {
     CPPMM_IGNORE
     auto handle() const -> _IO_FILE*;
 
-    CPPMM_IGNORE
-    IOFile(const OIIO::Filesystem::IOFile& rhs);
-
-    CPPMM_IGNORE
-    auto operator=(const OIIO::Filesystem::IOFile& rhs)
-        -> OIIO::Filesystem::IOFile&;
-} CPPMM_OPAQUEBYTES; // struct IOFile
+} CPPMM_OPAQUEPTR; // struct IOFile
 
 struct IOVecOutput {
     using BoundType = OIIO::Filesystem::IOVecOutput;
@@ -229,7 +229,7 @@ struct IOVecOutput {
     auto seek(long offset) -> bool;
     auto read(void* buf, unsigned long size) -> unsigned long;
     auto write(const void* buf, unsigned long size) -> unsigned long;
-    auto write(OIIO::string_view buf) -> unsigned long;
+    unsigned long write(OIIO::string_view buf) CPPMM_RENAME(write_string_view);
     auto pread(void* buf, unsigned long size, long offset) -> unsigned long;
     auto pwrite(const void* buf, unsigned long size, long offset)
         -> unsigned long;
@@ -240,7 +240,9 @@ struct IOVecOutput {
     template <typename T> auto read(OIIO::span<T, -1> buf) -> unsigned long;
     template <typename T> auto write(OIIO::span<T, -1> buf) -> unsigned long;
 
-    auto seek(long offset, int origin) -> bool;
+    bool seek(long offset, int origin) CPPMM_RENAME(seek_with_origin);
+
+    CPPMM_RENAME(error_const)
     auto error() const -> std::string;
     auto error(OIIO::string_view e) -> void;
 
@@ -248,17 +250,8 @@ struct IOVecOutput {
     IOVecOutput(std::vector<unsigned char>& buf) CPPMM_RENAME(from_buf);
     auto buffer() const -> std::vector<unsigned char>&;
 
-    CPPMM_IGNORE
-    IOVecOutput(const OIIO::Filesystem::IOVecOutput& rhs);
-
-    IOVecOutput(OIIO::Filesystem::IOVecOutput&&) CPPMM_IGNORE;
-
-    CPPMM_IGNORE
-    auto operator=(const OIIO::Filesystem::IOVecOutput& rhs)
-        -> OIIO::Filesystem::IOVecOutput&;
-
     ~IOVecOutput();
-} CPPMM_OPAQUEBYTES; // struct IOVecOutput
+} CPPMM_OPAQUEPTR; // struct IOVecOutput
 
 struct IOMemReader {
     using BoundType = OIIO::Filesystem::IOMemReader;
@@ -268,10 +261,10 @@ struct IOMemReader {
     auto opened() const -> bool;
     auto tell() -> long;
     auto seek(long offset) -> bool;
-    auto seek(long offset, int origin) -> bool;
+    bool seek(long offset, int origin) CPPMM_RENAME(seek_with_origin);
     auto read(void* buf, unsigned long size) -> unsigned long;
     auto write(const void* buf, unsigned long size) -> unsigned long;
-    auto write(OIIO::string_view buf) -> unsigned long;
+    unsigned long write(OIIO::string_view buf) CPPMM_RENAME(write_string_view);
     auto pread(void* buf, unsigned long size, long offset) -> unsigned long;
     auto pwrite(const void* buf, unsigned long size, long offset)
         -> unsigned long;
@@ -300,7 +293,7 @@ struct IOMemReader {
         -> OIIO::Filesystem::IOMemReader&;
 
     ~IOMemReader();
-} CPPMM_OPAQUEBYTES; // struct IOMemReader
+} CPPMM_OPAQUEPTR; // struct IOMemReader
 
 } // namespace Filesystem
 

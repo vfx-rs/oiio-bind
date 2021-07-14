@@ -12,16 +12,30 @@ struct ImageBuf {
 
     CPPMM_RENAME(default)
     ImageBuf();
+
     ~ImageBuf();
+
     ImageBuf(OIIO::string_view name, int subimage, int miplevel,
              OIIO::ImageCache* imagecache, const OIIO::ImageSpec* config,
              OIIO::Filesystem::IOProxy* ioproxy);
+
+    CPPMM_IGNORE
     ImageBuf(OIIO::string_view name, OIIO::ImageCache* imagecache);
+
+    CPPMM_RENAME(ctor_initialized)
     ImageBuf(const OIIO::ImageSpec& spec, OIIO::InitializePixels zero);
+
+    CPPMM_IGNORE
     ImageBuf(OIIO::string_view name, const OIIO::ImageSpec& spec,
              OIIO::InitializePixels zero);
-    ImageBuf(const OIIO::ImageSpec& spec, void* buffer);
+
+    CPPMM_RENAME(wrap_buffer)
+    ImageBuf(const OIIO::ImageSpec& spec, void* buffer, OIIO::stride_t x_stride,
+             OIIO::stride_t y_stride, OIIO::stride_t z_stride);
+
+    CPPMM_IGNORE
     ImageBuf(OIIO::string_view name, const OIIO::ImageSpec& spec, void* buffer);
+
     ImageBuf(const OIIO::ImageBuf& src);
 
     CPPMM_IGNORE
@@ -30,22 +44,38 @@ struct ImageBuf {
     auto clear() -> void;
 
     auto reset() -> void;
+
+    CPPMM_IGNORE
     auto reset(OIIO::string_view name, OIIO::ImageCache* imagecache) -> void;
+
+    CPPMM_RENAME(reset_with_file)
     auto reset(OIIO::string_view name, int subimage, int miplevel,
                OIIO::ImageCache* imagecache, const OIIO::ImageSpec* config,
                OIIO::Filesystem::IOProxy* ioproxy) -> void;
+
+    CPPMM_RENAME(reset_initialized)
     auto reset(const OIIO::ImageSpec& spec, OIIO::InitializePixels zero)
         -> void;
+
+    CPPMM_IGNORE
     auto reset(OIIO::string_view name, const OIIO::ImageSpec& spec,
                OIIO::InitializePixels zero) -> void;
-    auto reset(const OIIO::ImageSpec& spec, void* buffer) -> void;
+
+    CPPMM_RENAME(reset_wrap_buffer)
+    void reset(const OIIO::ImageSpec& spec, void* buffer,
+               OIIO::stride_t x_stride, OIIO::stride_t y_stride,
+               OIIO::stride_t z_stride);
 
     auto make_writable(bool keep_cache_type) -> bool;
+
+    CPPMM_IGNORE
     auto make_writeable(bool keep_cache_type) -> bool;
 
     auto read(int subimage, int miplevel, bool force, OIIO::TypeDesc convert,
               OIIO::ProgressCallback progress_callback,
               void* progress_callback_data) -> bool;
+
+    CPPMM_RENAME(read_with_channels)
     auto read(int subimage, int miplevel, int chbegin, int chend, bool force,
               OIIO::TypeDesc convert, OIIO::ProgressCallback progress_callback,
               void* progress_callback_data) -> bool;
@@ -57,15 +87,22 @@ struct ImageBuf {
                OIIO::string_view fileformat,
                OIIO::ProgressCallback progress_callback,
                void* progress_callback_data) const -> bool;
+
+    CPPMM_IGNORE
     auto write(OIIO::string_view filename, OIIO::string_view fileformat,
                OIIO::ProgressCallback progress_callback,
                void* progress_callback_data) const -> bool;
 
     auto set_write_format(OIIO::TypeDesc format) -> void;
+
+    CPPMM_RENAME(set_write_format_per_channel)
     auto set_write_format(OIIO::span<const OIIO::TypeDesc, -1> format) -> void;
 
     auto set_write_tiles(int width, int height, int depth) -> void;
+
     auto set_write_ioproxy(OIIO::Filesystem::IOProxy* ioproxy) -> void;
+
+    CPPMM_RENAME(write_to_imageoutput)
     auto write(OIIO::ImageOutput* out, OIIO::ProgressCallback progress_callback,
                void* progress_callback_data) const -> bool;
 
@@ -74,7 +111,10 @@ struct ImageBuf {
     auto copy_metadata(const OIIO::ImageBuf& src) -> void;
     auto copy_pixels(const OIIO::ImageBuf& src) -> bool;
 
+    CPPMM_RENAME(copy_from)
     auto copy(const OIIO::ImageBuf& src, OIIO::TypeDesc format) -> bool;
+
+    CPPMM_RENAME(clone)
     auto copy(OIIO::TypeDesc format) const -> OIIO::ImageBuf;
 
     auto swap(OIIO::ImageBuf& other) -> void;
@@ -82,8 +122,10 @@ struct ImageBuf {
     auto getchannel(int x, int y, int z, int c,
                     OIIO::ImageBuf::WrapMode wrap) const -> float;
 
+    CPPMM_RENAME(getpixel_3d)
     auto getpixel(int x, int y, int z, float* pixel, int maxchannels,
                   OIIO::ImageBuf::WrapMode wrap) const -> void;
+
     auto getpixel(int x, int y, float* pixel, int maxchannels) const -> void;
 
     auto interppixel(float x, float y, float* pixel,
@@ -91,21 +133,33 @@ struct ImageBuf {
 
     auto interppixel_NDC(float s, float t, float* pixel,
                          OIIO::ImageBuf::WrapMode wrap) const -> void;
+
     auto interppixel_NDC_full(float s, float t, float* pixel,
                               OIIO::ImageBuf::WrapMode wrap) const -> void;
 
     auto interppixel_bicubic(float x, float y, float* pixel,
                              OIIO::ImageBuf::WrapMode wrap) const -> void;
+
     auto interppixel_bicubic_NDC(float s, float t, float* pixel,
                                  OIIO::ImageBuf::WrapMode wrap) const -> void;
 
+    CPPMM_RENAME(setpixel_span)
     auto setpixel(int x, int y, OIIO::span<const float, -1> pixel) -> void;
+
+    CPPMM_RENAME(setpixel_3d_span)
     auto setpixel(int x, int y, int z, OIIO::span<const float, -1> pixel)
         -> void;
+
+    CPPMM_RENAME(setpixel_at_index_span)
     auto setpixel(int i, OIIO::span<const float, -1> pixel) -> void;
+
     auto setpixel(int x, int y, const float* pixel, int maxchannels) -> void;
+
+    CPPMM_RENAME(setpixel_3d)
     auto setpixel(int x, int y, int z, const float* pixel, int maxchannels)
         -> void;
+
+    CPPMM_RENAME(setpixel_at_index)
     auto setpixel(int i, const float* pixel, int maxchannels) -> void;
 
     auto get_pixels(OIIO::ROI roi, OIIO::TypeDesc format, void* result,
@@ -169,6 +223,8 @@ struct ImageBuf {
     auto pixeltype() const -> OIIO::TypeDesc;
 
     auto localpixels() -> void*;
+
+    CPPMM_RENAME(localpixels_const)
     auto localpixels() const -> const void*;
 
     auto pixel_stride() const -> long;
@@ -178,14 +234,18 @@ struct ImageBuf {
     auto cachedpixels() const -> bool;
     auto imagecache() const -> OIIO::ImageCache*;
 
+    CPPMM_RENAME(pixeladdr_const)
     auto pixeladdr(int x, int y, int z, int ch) const -> const void*;
     auto pixeladdr(int x, int y, int z, int ch) -> void*;
     auto pixelindex(int x, int y, int z, bool check_range) const -> int;
 
     auto threads(int n) const -> void;
+
+    CPPMM_RENAME(threads_const)
     auto threads() const -> int;
 
-    auto error(const std::string& message) const -> void;
+    void error(OIIO::string_view message) const;
+
     template <typename... Args>
     auto errorfmt(const char* fmt, Args... args) const -> void;
     template <typename... Args>
@@ -196,7 +256,7 @@ struct ImageBuf {
     auto fmterror(const char* fmt, Args... args) const -> void;
 
     auto has_error() const -> bool;
-    auto geterror() const -> std::string;
+    auto geterror(bool clear) const -> std::string;
 
     auto deep() const -> bool;
     auto deep_samples(int x, int y, int z) const -> int;
@@ -225,6 +285,14 @@ struct ImageBuf {
     CPPMM_RENAME(deepdata_const)
     auto deepdata() const -> const OIIO::DeepData*;
 
+    /// Is the data layout "contiguous", i.e.,
+    /// ```
+    ///     pixel_stride == nchannels * pixeltype().size()
+    ///     scanline_stride == pixel_stride * spec().width
+    ///     z_stride == scanline_stride * spec().height
+    /// ```
+    bool contiguous() const;
+
     static auto WrapMode_from_string(OIIO::string_view name)
         -> OIIO::ImageBuf::WrapMode;
 
@@ -247,23 +315,35 @@ struct ImageBuf {
     struct IteratorBase {
         using BoundType = OIIO::ImageBuf::IteratorBase;
 
+        CPPMM_RENAME(with_wrapmode)
         IteratorBase(const OIIO::ImageBuf& ib, OIIO::ImageBuf::WrapMode wrap);
+
+        CPPMM_RENAME(with_roi)
         IteratorBase(const OIIO::ImageBuf& ib, const OIIO::ROI& roi,
                      OIIO::ImageBuf::WrapMode wrap);
+
+        CPPMM_RENAME(with_range)
         IteratorBase(const OIIO::ImageBuf& ib, int xbegin, int xend, int ybegin,
                      int yend, int zbegin, int zend,
                      OIIO::ImageBuf::WrapMode wrap);
         IteratorBase(const OIIO::ImageBuf::IteratorBase& i);
+
         ~IteratorBase();
         auto assign_base(const OIIO::ImageBuf::IteratorBase& i)
             -> const OIIO::ImageBuf::IteratorBase&;
         auto x() const -> int;
         auto y() const -> int;
         auto z() const -> int;
+
         auto valid() const -> bool;
+
+        CPPMM_RENAME(valid_at_index)
         auto valid(int x_, int y_, int z_) const -> bool;
+
+        CPPMM_RENAME(exists_at_index)
         auto exists(int x_, int y_, int z_) const -> bool;
         auto exists() const -> bool;
+
         auto done() const -> bool;
         auto deep_samples() const -> int;
         auto wrap() const -> OIIO::ImageBuf::WrapMode;
@@ -274,7 +354,8 @@ struct ImageBuf {
         auto range() const -> OIIO::ROI;
         auto rerange(int xbegin, int xend, int ybegin, int yend, int zbegin,
                      int zend, OIIO::ImageBuf::WrapMode wrap) -> void;
-    } CPPMM_OPAQUEBYTES; // struct IteratorBase
+    } CPPMM_OPAQUEBYTES CPPMM_TRIVIALLY_COPYABLE
+        CPPMM_TRIVIALLY_MOVABLE; // struct IteratorBase
 
     template <class BUFT, class USERT> struct Iterator {
         using BoundType = OIIO::ImageBuf::Iterator<BUFT, USERT>;
@@ -320,7 +401,8 @@ struct ImageBuf {
         auto deep_value_uint(int c, int s) const -> unsigned int;
         auto set_deep_value(int c, int s, float value) -> void;
         auto set_deep_value(int c, int s, unsigned int value) -> void;
-    } CPPMM_OPAQUEBYTES; // struct Iterator
+    } CPPMM_OPAQUEBYTES CPPMM_TRIVIALLY_MOVABLE
+        CPPMM_TRIVIALLY_COPYABLE; // struct Iterator
 
     // TODO: fill in explicit instantiations, e.g.:
     // template class Iterator<int, int>;
@@ -368,13 +450,14 @@ struct ImageBuf {
         auto rawptr() const -> const void*;
         auto deep_value(int c, int s) const -> USERT;
         auto deep_value_uint(int c, int s) const -> unsigned int;
-    } CPPMM_OPAQUEBYTES; // struct ConstIterator
+    } CPPMM_OPAQUEBYTES CPPMM_TRIVIALLY_MOVABLE
+        CPPMM_TRIVIALLY_COPYABLE; // struct ConstIterator
 
     // TODO: fill in explicit instantiations, e.g.:
     // template class ConstIterator<int, int>;
     // using ConstIteratorInt = OIIO::ImageBuf::ConstIterator<int, int>;
 
-} CPPMM_OPAQUEBYTES; // struct ImageBuf
+} CPPMM_OPAQUEPTR; // struct ImageBuf
 
 auto get_roi(const OIIO::ImageSpec& spec) -> OIIO::ROI;
 

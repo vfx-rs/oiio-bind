@@ -10,40 +10,69 @@ namespace OIIO = ::OIIO_NAMESPACE;
 struct ParamValue {
     using BoundType = OIIO::ParamValue;
 
+    CPPMM_RENAME(default)
     ParamValue();
+
+    CPPMM_RENAME(ctor_ustring)
     ParamValue(const OIIO::ustring& _name, OIIO::TypeDesc _type, int _nvalues,
                const void* _value, bool _copy);
+
+    CPPMM_RENAME(with_interp_ustring)
     ParamValue(const OIIO::ustring& _name, OIIO::TypeDesc _type, int _nvalues,
                OIIO::ParamValue::Interp _interp, const void* _value,
                bool _copy);
+
     ParamValue(OIIO::string_view _name, OIIO::TypeDesc _type, int _nvalues,
                const void* _value, bool _copy);
+
+    CPPMM_RENAME(with_interp)
     ParamValue(OIIO::string_view _name, OIIO::TypeDesc _type, int _nvalues,
                OIIO::ParamValue::Interp _interp, const void* _value,
                bool _copy);
+
+    CPPMM_RENAME(from_int)
     ParamValue(OIIO::string_view _name, int value);
+
+    CPPMM_RENAME(from_float)
     ParamValue(OIIO::string_view _name, float value);
+
+    CPPMM_RENAME(from_ustring)
     ParamValue(OIIO::string_view _name, OIIO::ustring value);
+
+    CPPMM_RENAME(from_string)
     ParamValue(OIIO::string_view _name, OIIO::string_view value);
+
+    CPPMM_RENAME(parse)
     ParamValue(OIIO::string_view _name, OIIO::TypeDesc type,
                OIIO::string_view value);
+
     ParamValue(const OIIO::ParamValue& p);
+
+    CPPMM_IGNORE
     ParamValue(const OIIO::ParamValue& p, bool _copy);
 
     CPPMM_IGNORE
     ParamValue(OIIO::ParamValue&& p);
 
     ~ParamValue();
+
+    CPPMM_RENAME(init_with_interp_ustring)
     auto init(OIIO::ustring _name, OIIO::TypeDesc _type, int _nvalues,
               OIIO::ParamValue::Interp _interp, const void* _value, bool _copy)
         -> void;
+
+    CPPMM_RENAME(init_ustring)
     auto init(OIIO::ustring _name, OIIO::TypeDesc _type, int _nvalues,
               const void* _value, bool _copy) -> void;
+
     auto init(OIIO::string_view _name, OIIO::TypeDesc _type, int _nvalues,
               const void* _value, bool _copy) -> void;
+
+    CPPMM_RENAME(init_with_interp)
     auto init(OIIO::string_view _name, OIIO::TypeDesc _type, int _nvalues,
               OIIO::ParamValue::Interp _interp, const void* _value, bool _copy)
         -> void;
+
     auto operator=(const OIIO::ParamValue& p) -> const OIIO::ParamValue&;
 
     auto name() const -> const OIIO::ustring&;
@@ -52,8 +81,12 @@ struct ParamValue {
     auto nvalues() const -> int;
     auto data() const -> const void*;
     auto datasize() const -> int;
+
+    CPPMM_RENAME(interp_const)
     auto interp() const -> OIIO::ParamValue::Interp;
+
     auto interp(OIIO::ParamValue::Interp i) -> void;
+
     auto is_nonlocal() const -> bool;
 
     template <typename T> const T& get(int i) const CPPMM_IGNORE;
@@ -74,7 +107,7 @@ struct ParamValue {
         INTERP_VERTEX = 3,
     };
 
-} CPPMM_OPAQUEBYTES; // struct ParamValue
+} CPPMM_OPAQUEPTR; // struct ParamValue
 
 struct ParamValueList {
     using BoundType = OIIO::ParamValueList;
@@ -100,6 +133,7 @@ struct ParamValueList {
     auto find_pv(OIIO::string_view name, OIIO::TypeDesc type,
                  bool casesensitive) -> OIIO::ParamValue*;
 
+    CPPMM_RENAME(find_pv_const)
     auto find_pv(OIIO::string_view name, OIIO::TypeDesc type,
                  bool casesensitive) const -> const OIIO::ParamValue*;
 
@@ -123,16 +157,31 @@ struct ParamValueList {
                   bool casesensitive) const -> bool;
 
     auto add_or_replace(const OIIO::ParamValue& pv, bool casesensitive) -> void;
+
+    CPPMM_IGNORE
     auto add_or_replace(OIIO::ParamValue&& pv, bool casesensitive) -> void;
+
     auto attribute(OIIO::string_view name, OIIO::TypeDesc type, int nvalues,
                    const void* value) -> void;
+
+    CPPMM_IGNORE
     auto attribute(OIIO::string_view name, OIIO::TypeDesc type,
                    const void* value) -> void;
+
+    CPPMM_RENAME(attribute_parse_from_string)
     auto attribute(OIIO::string_view name, OIIO::TypeDesc type,
                    OIIO::string_view value) -> void;
+
+    CPPMM_RENAME(attribute_int)
     auto attribute(OIIO::string_view name, int value) -> void;
+
+    CPPMM_RENAME(attribute_uint)
     auto attribute(OIIO::string_view name, unsigned int value) -> void;
+
+    CPPMM_RENAME(attribute_float)
     auto attribute(OIIO::string_view name, float value) -> void;
+
+    CPPMM_RENAME(attribute_string)
     auto attribute(OIIO::string_view name, OIIO::string_view value) -> void;
 
     auto getattributetype(OIIO::string_view name, bool casesensitive) const
@@ -141,6 +190,7 @@ struct ParamValueList {
     auto getattribute(OIIO::string_view name, OIIO::TypeDesc type, void* value,
                       bool casesensitive) const -> bool;
 
+    CPPMM_RENAME(getattribute_as_string)
     auto getattribute(OIIO::string_view name, std::string& value,
                       bool casesensitive) const -> bool;
 
@@ -148,6 +198,7 @@ struct ParamValueList {
                               OIIO::TypeDesc type, void* value,
                               bool casesensitive) const -> bool;
 
+    CPPMM_RENAME(getattribute_indexed_as_string)
     auto getattribute_indexed(OIIO::string_view name, int index,
                               std::string& value, bool casesensitive) const
         -> bool;
@@ -173,7 +224,7 @@ struct ParamValueList {
     ParamValueList(OIIO::ParamValueList&&);
 
     ~ParamValueList();
-} CPPMM_OPAQUEBYTES CPPMM_IGNORE_UNBOUND; // struct ParamValueList
+} CPPMM_OPAQUEPTR CPPMM_IGNORE_UNBOUND; // struct ParamValueList
 
 } // namespace OIIO_NAMESPACE
 

@@ -57,7 +57,8 @@ template <class T, ptrdiff_t Extent = -1> struct span {
     auto end() const -> T*;
     auto cbegin() const -> const T*;
     auto cend() const -> const T*;
-} CPPMM_OPAQUEBYTES CPPMM_IGNORE_UNBOUND; // struct span
+} CPPMM_OPAQUEBYTES CPPMM_IGNORE_UNBOUND CPPMM_TRIVIALLY_MOVABLE
+    CPPMM_TRIVIALLY_COPYABLE; // struct span
 
 // TODO: fill in explicit instantiations, e.g.:
 // template class span<int, int>;

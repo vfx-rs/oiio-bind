@@ -46,6 +46,7 @@ enum class Wrap {
 
 auto decode_wrapmode(const char* name) -> OIIO::Tex::Wrap;
 
+CPPMM_RENAME(decode_wrapmode_ustring)
 auto decode_wrapmode(OIIO::ustring name) -> OIIO::Tex::Wrap;
 
 auto parse_wrapmodes(const char* wrapmodes, OIIO::Tex::Wrap& swrapcode,
@@ -73,6 +74,8 @@ enum RunFlagVal {
     RunFlagOn = 255,
 };
 
+// DEPRECATED (1.8)
+/*
 struct TextureOptions {
     using BoundType = OIIO::TextureOptions;
 
@@ -118,19 +121,25 @@ struct TextureOptions {
         InterpSmartBicubic = 3,
     };
 } CPPMM_OPAQUEBYTES; // struct TextureOptions
+*/
 
 struct TextureOpt {
     using BoundType = OIIO::TextureOpt;
 
     TextureOpt();
-    TextureOpt(const OIIO::TextureOptions& opt, int index);
+    TextureOpt(const OIIO::TextureOptions& opt, int index) CPPMM_IGNORE;
+
     static auto decode_wrapmode(const char* name) -> OIIO::TextureOpt::Wrap;
+
+    CPPMM_RENAME(decode_wrapmode_ustring)
     static auto decode_wrapmode(OIIO::ustring name) -> OIIO::TextureOpt::Wrap;
+
     static auto parse_wrapmodes(const char* wrapmodes,
                                 OIIO::TextureOpt::Wrap& swrapcode,
                                 OIIO::TextureOpt::Wrap& twrapcode) -> void;
 
     TextureOpt(const OIIO::TextureOpt& rhs);
+    OIIO::TextureOpt& operator=(const OIIO::TextureOpt& rhs);
 
     CPPMM_IGNORE
     TextureOpt(OIIO::TextureOpt&&);
@@ -162,21 +171,30 @@ struct TextureOpt {
         InterpBicubic = 2,
         InterpSmartBicubic = 3,
     };
-} CPPMM_OPAQUEBYTES; // struct TextureOpt
+} CPPMM_OPAQUEPTR; // struct TextureOpt
 
 struct TextureOptBatch {
     using BoundType = OIIO::TextureOptBatch;
 
     TextureOptBatch();
     TextureOptBatch(const OIIO::TextureOptBatch& rhs);
+    OIIO::TextureOptBatch& operator=(const OIIO::TextureOptBatch& rhs);
 
     CPPMM_IGNORE
     TextureOptBatch(OIIO::TextureOptBatch&&);
     ~TextureOptBatch();
-} CPPMM_OPAQUEBYTES; // struct TextureOptBatch
+} CPPMM_OPAQUEPTR; // struct TextureOptBatch
 
 struct TextureSystem {
     using BoundType = OIIO::TextureSystem;
+
+    class Perthread {
+        using BoundType = OIIO::TextureSystem::Perthread;
+    } CPPMM_OPAQUETYPE;
+
+    class TextureHandle {
+        using BoundType = OIIO::TextureSystem::TextureHandle;
+    } CPPMM_OPAQUETYPE;
 
     OIIO::TextureSystem& operator=(const OIIO::TextureSystem&);
 
@@ -184,213 +202,268 @@ struct TextureSystem {
         -> OIIO::TextureSystem*;
     static auto destroy(OIIO::TextureSystem* ts, bool teardown_imagecache)
         -> void;
-    auto attribute(OIIO::string_view name, OIIO::TypeDesc type, const void* val)
-        -> bool;
-    auto attribute(OIIO::string_view name, int val) -> bool;
-    auto attribute(OIIO::string_view name, float val) -> bool;
-    auto attribute(OIIO::string_view name, double val) -> bool;
-    auto attribute(OIIO::string_view name, OIIO::string_view val) -> bool;
-    auto getattribute(OIIO::string_view name, OIIO::TypeDesc type,
-                      void* val) const -> bool;
-    auto getattribute(OIIO::string_view name, int& val) const -> bool;
-    auto getattribute(OIIO::string_view name, float& val) const -> bool;
-    auto getattribute(OIIO::string_view name, double& val) const -> bool;
-    auto getattribute(OIIO::string_view name, char** val) const -> bool;
-    auto getattribute(OIIO::string_view name, std::string& val) const -> bool;
+
+    bool attribute(OIIO::string_view name, OIIO::TypeDesc type,
+                   const void* val);
+
+    bool attribute(OIIO::string_view name, int val) CPPMM_RENAME(attribute_int);
+    bool attribute(OIIO::string_view name, float val)
+        CPPMM_RENAME(attribute_float);
+    bool attribute(OIIO::string_view name, double val)
+        CPPMM_RENAME(attribute_double);
+    bool attribute(OIIO::string_view name, OIIO::string_view val)
+        CPPMM_RENAME(attribute_string);
+
+    bool getattribute(OIIO::string_view name, OIIO::TypeDesc type,
+                      void* val) const;
+    bool getattribute(OIIO::string_view name, int& val) const
+        CPPMM_RENAME(getattribute_int);
+    bool getattribute(OIIO::string_view name, float& val) const
+        CPPMM_RENAME(getattribute_float);
+    bool getattribute(OIIO::string_view name, double& val) const
+        CPPMM_RENAME(getattribute_double);
+    bool getattribute(OIIO::string_view name, char** val) const
+        CPPMM_RENAME(getattribute_cstr);
+    bool getattribute(OIIO::string_view name, std::string& val) const
+        CPPMM_RENAME(getattribute_string);
+
     auto get_perthread_info(OIIO::TextureSystem::Perthread* thread_info)
         -> OIIO::TextureSystem::Perthread*;
+
     auto create_thread_info() -> OIIO::TextureSystem::Perthread*;
     auto destroy_thread_info(OIIO::TextureSystem::Perthread* threadinfo)
         -> void;
     auto get_texture_handle(OIIO::ustring filename,
                             OIIO::TextureSystem::Perthread* thread_info)
         -> OIIO::TextureSystem::TextureHandle*;
+
     auto good(OIIO::TextureSystem::TextureHandle* texture_handle) -> bool;
-    auto texture(OIIO::ustring filename, OIIO::TextureOpt& options, float s,
+
+    bool texture(OIIO::ustring filename, OIIO::TextureOpt& options, float s,
                  float t, float dsdx, float dtdx, float dsdy, float dtdy,
                  int nchannels, float* result, float* dresultds,
-                 float* dresultdt) -> bool;
-    auto texture(OIIO::TextureSystem::TextureHandle* texture_handle,
+                 float* dresultdt);
+
+    bool texture(OIIO::TextureSystem::TextureHandle* texture_handle,
                  OIIO::TextureSystem::Perthread* thread_info,
                  OIIO::TextureOpt& options, float s, float t, float dsdx,
                  float dtdx, float dsdy, float dtdy, int nchannels,
-                 float* result, float* dresultds, float* dresultdt) -> bool;
+                 float* result, float* dresultds, float* dresultdt)
+        CPPMM_RENAME(texture_handle);
+
     auto texture3d(OIIO::ustring filename, OIIO::TextureOpt& options,
-                   const Imath_2_5::Vec3<float>& P,
-                   const Imath_2_5::Vec3<float>& dPdx,
-                   const Imath_2_5::Vec3<float>& dPdy,
-                   const Imath_2_5::Vec3<float>& dPdz, int nchannels,
-                   float* result, float* dresultds, float* dresultdt,
-                   float* dresultdr) -> bool;
-    auto texture3d(OIIO::TextureSystem::TextureHandle* texture_handle,
+                   const Imath::Vec3<float>& P, const Imath::Vec3<float>& dPdx,
+                   const Imath::Vec3<float>& dPdy,
+                   const Imath::Vec3<float>& dPdz, int nchannels, float* result,
+                   float* dresultds, float* dresultdt, float* dresultdr)
+        -> bool;
+
+    bool texture3d(OIIO::TextureSystem::TextureHandle* texture_handle,
                    OIIO::TextureSystem::Perthread* thread_info,
-                   OIIO::TextureOpt& options, const Imath_2_5::Vec3<float>& P,
-                   const Imath_2_5::Vec3<float>& dPdx,
-                   const Imath_2_5::Vec3<float>& dPdy,
-                   const Imath_2_5::Vec3<float>& dPdz, int nchannels,
-                   float* result, float* dresultds, float* dresultdt,
-                   float* dresultdr) -> bool;
+                   OIIO::TextureOpt& options, const Imath::Vec3<float>& P,
+                   const Imath::Vec3<float>& dPdx,
+                   const Imath::Vec3<float>& dPdy,
+                   const Imath::Vec3<float>& dPdz, int nchannels, float* result,
+                   float* dresultds, float* dresultdt, float* dresultdr)
+        CPPMM_RENAME(texture3d_handle);
+
     auto shadow(OIIO::ustring filename, OIIO::TextureOpt& options,
-                const Imath_2_5::Vec3<float>& P,
-                const Imath_2_5::Vec3<float>& dPdx,
-                const Imath_2_5::Vec3<float>& dPdy, float* result,
-                float* dresultds, float* dresultdt) -> bool;
-    auto shadow(OIIO::TextureSystem::TextureHandle* texture_handle,
+                const Imath::Vec3<float>& P, const Imath::Vec3<float>& dPdx,
+                const Imath::Vec3<float>& dPdy, float* result, float* dresultds,
+                float* dresultdt) -> bool;
+
+    bool shadow(OIIO::TextureSystem::TextureHandle* texture_handle,
                 OIIO::TextureSystem::Perthread* thread_info,
-                OIIO::TextureOpt& options, const Imath_2_5::Vec3<float>& P,
-                const Imath_2_5::Vec3<float>& dPdx,
-                const Imath_2_5::Vec3<float>& dPdy, float* result,
-                float* dresultds, float* dresultdt) -> bool;
+                OIIO::TextureOpt& options, const Imath::Vec3<float>& P,
+                const Imath::Vec3<float>& dPdx, const Imath::Vec3<float>& dPdy,
+                float* result, float* dresultds, float* dresultdt)
+        CPPMM_RENAME(shadow_handle);
+
     auto environment(OIIO::ustring filename, OIIO::TextureOpt& options,
-                     const Imath_2_5::Vec3<float>& R,
-                     const Imath_2_5::Vec3<float>& dRdx,
-                     const Imath_2_5::Vec3<float>& dRdy, int nchannels,
+                     const Imath::Vec3<float>& R,
+                     const Imath::Vec3<float>& dRdx,
+                     const Imath::Vec3<float>& dRdy, int nchannels,
                      float* result, float* dresultds, float* dresultdt) -> bool;
-    auto environment(OIIO::TextureSystem::TextureHandle* texture_handle,
+
+    bool environment(OIIO::TextureSystem::TextureHandle* texture_handle,
                      OIIO::TextureSystem::Perthread* thread_info,
-                     OIIO::TextureOpt& options, const Imath_2_5::Vec3<float>& R,
-                     const Imath_2_5::Vec3<float>& dRdx,
-                     const Imath_2_5::Vec3<float>& dRdy, int nchannels,
-                     float* result, float* dresultds, float* dresultdt) -> bool;
-    auto texture(OIIO::ustring filename, OIIO::TextureOptBatch& options,
+                     OIIO::TextureOpt& options, const Imath::Vec3<float>& R,
+                     const Imath::Vec3<float>& dRdx,
+                     const Imath::Vec3<float>& dRdy, int nchannels,
+                     float* result, float* dresultds, float* dresultdt)
+        CPPMM_RENAME(environment_handle);
+
+    bool texture(OIIO::ustring filename, OIIO::TextureOptBatch& options,
                  unsigned long mask, const float* s, const float* t,
                  const float* dsdx, const float* dtdx, const float* dsdy,
                  const float* dtdy, int nchannels, float* result,
-                 float* dresultds, float* dresultdt) -> bool;
-    auto texture(OIIO::TextureSystem::TextureHandle* texture_handle,
+                 float* dresultds, float* dresultdt)
+        CPPMM_RENAME(texture_batch);
+
+    bool texture(OIIO::TextureSystem::TextureHandle* texture_handle,
                  OIIO::TextureSystem::Perthread* thread_info,
                  OIIO::TextureOptBatch& options, unsigned long mask,
                  const float* s, const float* t, const float* dsdx,
                  const float* dtdx, const float* dsdy, const float* dtdy,
                  int nchannels, float* result, float* dresultds,
-                 float* dresultdt) -> bool;
-    auto texture(OIIO::ustring filename, OIIO::TextureOptions& options,
+                 float* dresultdt) CPPMM_RENAME(texture_handle_batch);
+
+    bool texture(OIIO::ustring filename, OIIO::TextureOptions& options,
                  unsigned char* runflags, int beginactive, int endactive,
                  OIIO::VaryingRef<float> s, OIIO::VaryingRef<float> t,
                  OIIO::VaryingRef<float> dsdx, OIIO::VaryingRef<float> dtdx,
                  OIIO::VaryingRef<float> dsdy, OIIO::VaryingRef<float> dtdy,
                  int nchannels, float* result, float* dresultds,
-                 float* dresultdt) -> bool;
-    auto texture(OIIO::TextureSystem::TextureHandle* texture_handle,
+                 float* dresultdt) CPPMM_IGNORE;
+
+    bool texture(OIIO::TextureSystem::TextureHandle* texture_handle,
                  OIIO::TextureSystem::Perthread* thread_info,
                  OIIO::TextureOptions& options, unsigned char* runflags,
                  int beginactive, int endactive, OIIO::VaryingRef<float> s,
                  OIIO::VaryingRef<float> t, OIIO::VaryingRef<float> dsdx,
                  OIIO::VaryingRef<float> dtdx, OIIO::VaryingRef<float> dsdy,
                  OIIO::VaryingRef<float> dtdy, int nchannels, float* result,
-                 float* dresultds, float* dresultdt) -> bool;
-    auto texture3d(OIIO::ustring filename, OIIO::TextureOptBatch& options,
+                 float* dresultds, float* dresultdt) CPPMM_IGNORE;
+
+    bool texture3d(OIIO::ustring filename, OIIO::TextureOptBatch& options,
                    unsigned long mask, const float* P, const float* dPdx,
                    const float* dPdy, const float* dPdz, int nchannels,
                    float* result, float* dresultds, float* dresultdt,
-                   float* dresultdr) -> bool;
-    auto texture3d(OIIO::TextureSystem::TextureHandle* texture_handle,
+                   float* dresultdr) CPPMM_RENAME(texture3d_batch);
+
+    bool texture3d(OIIO::TextureSystem::TextureHandle* texture_handle,
                    OIIO::TextureSystem::Perthread* thread_info,
                    OIIO::TextureOptBatch& options, unsigned long mask,
                    const float* P, const float* dPdx, const float* dPdy,
                    const float* dPdz, int nchannels, float* result,
                    float* dresultds, float* dresultdt, float* dresultdr)
-        -> bool;
-    auto texture3d(OIIO::ustring filename, OIIO::TextureOptions& options,
+        CPPMM_RENAME(texture3d_handle_batch);
+
+    bool texture3d(OIIO::ustring filename, OIIO::TextureOptions& options,
                    unsigned char* runflags, int beginactive, int endactive,
-                   OIIO::VaryingRef<Imath_2_5::Vec3<float>> P,
-                   OIIO::VaryingRef<Imath_2_5::Vec3<float>> dPdx,
-                   OIIO::VaryingRef<Imath_2_5::Vec3<float>> dPdy,
-                   OIIO::VaryingRef<Imath_2_5::Vec3<float>> dPdz, int nchannels,
+                   OIIO::VaryingRef<Imath::Vec3<float>> P,
+                   OIIO::VaryingRef<Imath::Vec3<float>> dPdx,
+                   OIIO::VaryingRef<Imath::Vec3<float>> dPdy,
+                   OIIO::VaryingRef<Imath::Vec3<float>> dPdz, int nchannels,
                    float* result, float* dresultds, float* dresultdt,
-                   float* dresultdr) -> bool;
-    auto texture3d(OIIO::TextureSystem::TextureHandle* texture_handle,
+                   float* dresultdr) CPPMM_IGNORE;
+
+    bool texture3d(OIIO::TextureSystem::TextureHandle* texture_handle,
                    OIIO::TextureSystem::Perthread* thread_info,
                    OIIO::TextureOptions& options, unsigned char* runflags,
                    int beginactive, int endactive,
-                   OIIO::VaryingRef<Imath_2_5::Vec3<float>> P,
-                   OIIO::VaryingRef<Imath_2_5::Vec3<float>> dPdx,
-                   OIIO::VaryingRef<Imath_2_5::Vec3<float>> dPdy,
-                   OIIO::VaryingRef<Imath_2_5::Vec3<float>> dPdz, int nchannels,
+                   OIIO::VaryingRef<Imath::Vec3<float>> P,
+                   OIIO::VaryingRef<Imath::Vec3<float>> dPdx,
+                   OIIO::VaryingRef<Imath::Vec3<float>> dPdy,
+                   OIIO::VaryingRef<Imath::Vec3<float>> dPdz, int nchannels,
                    float* result, float* dresultds, float* dresultdt,
-                   float* dresultdr) -> bool;
-    auto environment(OIIO::ustring filename, OIIO::TextureOptBatch& options,
+                   float* dresultdr) CPPMM_IGNORE;
+
+    bool environment(OIIO::ustring filename, OIIO::TextureOptBatch& options,
                      unsigned long mask, const float* R, const float* dRdx,
                      const float* dRdy, int nchannels, float* result,
-                     float* dresultds, float* dresultdt) -> bool;
-    auto environment(OIIO::TextureSystem::TextureHandle* texture_handle,
+                     float* dresultds, float* dresultdt)
+        CPPMM_RENAME(environment_batch);
+
+    bool environment(OIIO::TextureSystem::TextureHandle* texture_handle,
                      OIIO::TextureSystem::Perthread* thread_info,
                      OIIO::TextureOptBatch& options, unsigned long mask,
                      const float* R, const float* dRdx, const float* dRdy,
                      int nchannels, float* result, float* dresultds,
-                     float* dresultdt) -> bool;
-    auto environment(OIIO::ustring filename, OIIO::TextureOptions& options,
+                     float* dresultdt) CPPMM_RENAME(environment_handle_batch);
+
+    bool environment(OIIO::ustring filename, OIIO::TextureOptions& options,
                      unsigned char* runflags, int beginactive, int endactive,
-                     OIIO::VaryingRef<Imath_2_5::Vec3<float>> R,
-                     OIIO::VaryingRef<Imath_2_5::Vec3<float>> dRdx,
-                     OIIO::VaryingRef<Imath_2_5::Vec3<float>> dRdy,
-                     int nchannels, float* result, float* dresultds,
-                     float* dresultdt) -> bool;
-    auto environment(OIIO::TextureSystem::TextureHandle* texture_handle,
+                     OIIO::VaryingRef<Imath::Vec3<float>> R,
+                     OIIO::VaryingRef<Imath::Vec3<float>> dRdx,
+                     OIIO::VaryingRef<Imath::Vec3<float>> dRdy, int nchannels,
+                     float* result, float* dresultds,
+                     float* dresultdt) CPPMM_IGNORE;
+
+    bool environment(OIIO::TextureSystem::TextureHandle* texture_handle,
                      OIIO::TextureSystem::Perthread* thread_info,
                      OIIO::TextureOptions& options, unsigned char* runflags,
                      int beginactive, int endactive,
-                     OIIO::VaryingRef<Imath_2_5::Vec3<float>> R,
-                     OIIO::VaryingRef<Imath_2_5::Vec3<float>> dRdx,
-                     OIIO::VaryingRef<Imath_2_5::Vec3<float>> dRdy,
-                     int nchannels, float* result, float* dresultds,
-                     float* dresultdt) -> bool;
-    auto shadow(OIIO::ustring filename, OIIO::TextureOptBatch& options,
+                     OIIO::VaryingRef<Imath::Vec3<float>> R,
+                     OIIO::VaryingRef<Imath::Vec3<float>> dRdx,
+                     OIIO::VaryingRef<Imath::Vec3<float>> dRdy, int nchannels,
+                     float* result, float* dresultds,
+                     float* dresultdt) CPPMM_IGNORE;
+
+    bool shadow(OIIO::ustring filename, OIIO::TextureOptBatch& options,
                 unsigned long mask, const float* P, const float* dPdx,
                 const float* dPdy, float* result, float* dresultds,
-                float* dresultdt) -> bool;
-    auto shadow(OIIO::TextureSystem::TextureHandle* texture_handle,
+                float* dresultdt) CPPMM_RENAME(shadow_batch);
+
+    bool shadow(OIIO::TextureSystem::TextureHandle* texture_handle,
                 OIIO::TextureSystem::Perthread* thread_info,
                 OIIO::TextureOptBatch& options, unsigned long mask,
                 const float* P, const float* dPdx, const float* dPdy,
-                float* result, float* dresultds, float* dresultdt) -> bool;
-    auto shadow(OIIO::ustring filename, OIIO::TextureOptions& options,
+                float* result, float* dresultds, float* dresultdt)
+        CPPMM_RENAME(shadow_handle_batch);
+
+    bool shadow(OIIO::ustring filename, OIIO::TextureOptions& options,
                 unsigned char* runflags, int beginactive, int endactive,
-                OIIO::VaryingRef<Imath_2_5::Vec3<float>> P,
-                OIIO::VaryingRef<Imath_2_5::Vec3<float>> dPdx,
-                OIIO::VaryingRef<Imath_2_5::Vec3<float>> dPdy, float* result,
-                float* dresultds, float* dresultdt) -> bool;
-    auto shadow(OIIO::TextureSystem::TextureHandle* texture_handle,
+                OIIO::VaryingRef<Imath::Vec3<float>> P,
+                OIIO::VaryingRef<Imath::Vec3<float>> dPdx,
+                OIIO::VaryingRef<Imath::Vec3<float>> dPdy, float* result,
+                float* dresultds, float* dresultdt) CPPMM_IGNORE;
+
+    bool shadow(OIIO::TextureSystem::TextureHandle* texture_handle,
                 OIIO::TextureSystem::Perthread* thread_info,
                 OIIO::TextureOptions& options, unsigned char* runflags,
                 int beginactive, int endactive,
-                OIIO::VaryingRef<Imath_2_5::Vec3<float>> P,
-                OIIO::VaryingRef<Imath_2_5::Vec3<float>> dPdx,
-                OIIO::VaryingRef<Imath_2_5::Vec3<float>> dPdy, float* result,
-                float* dresultds, float* dresultdt) -> bool;
+                OIIO::VaryingRef<Imath::Vec3<float>> P,
+                OIIO::VaryingRef<Imath::Vec3<float>> dPdx,
+                OIIO::VaryingRef<Imath::Vec3<float>> dPdy, float* result,
+                float* dresultds, float* dresultdt) CPPMM_IGNORE;
+
     auto resolve_filename(const std::string& filename) const -> std::string;
-    auto get_texture_info(OIIO::ustring filename, int subimage,
+
+    bool get_texture_info(OIIO::ustring filename, int subimage,
                           OIIO::ustring dataname, OIIO::TypeDesc datatype,
-                          void* data) -> bool;
-    auto get_texture_info(OIIO::TextureSystem::TextureHandle* texture_handle,
+                          void* data);
+
+    bool get_texture_info(OIIO::TextureSystem::TextureHandle* texture_handle,
                           OIIO::TextureSystem::Perthread* thread_info,
                           int subimage, OIIO::ustring dataname,
-                          OIIO::TypeDesc datatype, void* data) -> bool;
+                          OIIO::TypeDesc datatype, void* data)
+        CPPMM_RENAME(get_texture_info_from_handle);
+
     auto get_imagespec(OIIO::ustring filename, int subimage,
                        OIIO::ImageSpec& spec) -> bool;
-    auto get_imagespec(OIIO::TextureSystem::TextureHandle* texture_handle,
+
+    bool get_imagespec(OIIO::TextureSystem::TextureHandle* texture_handle,
                        OIIO::TextureSystem::Perthread* thread_info,
-                       int subimage, OIIO::ImageSpec& spec) -> bool;
-    auto imagespec(OIIO::ustring filename, int subimage)
-        -> const OIIO::ImageSpec*;
-    auto imagespec(OIIO::TextureSystem::TextureHandle* texture_handle,
-                   OIIO::TextureSystem::Perthread* thread_info, int subimage)
-        -> const OIIO::ImageSpec*;
+                       int subimage, OIIO::ImageSpec& spec)
+        CPPMM_RENAME(get_imagespec_from_handle);
+
+    const OIIO::ImageSpec* imagespec(OIIO::ustring filename, int subimage);
+
+    const OIIO::ImageSpec*
+    imagespec(OIIO::TextureSystem::TextureHandle* texture_handle,
+              OIIO::TextureSystem::Perthread* thread_info, int subimage)
+        CPPMM_RENAME(imagespace_from_handle);
+
     auto get_texels(OIIO::ustring filename, OIIO::TextureOpt& options,
                     int miplevel, int xbegin, int xend, int ybegin, int yend,
                     int zbegin, int zend, int chbegin, int chend,
                     OIIO::TypeDesc format, void* result) -> bool;
-    auto get_texels(OIIO::TextureSystem::TextureHandle* texture_handle,
+
+    bool get_texels(OIIO::TextureSystem::TextureHandle* texture_handle,
                     OIIO::TextureSystem::Perthread* thread_info,
                     OIIO::TextureOpt& options, int miplevel, int xbegin,
                     int xend, int ybegin, int yend, int zbegin, int zend,
                     int chbegin, int chend, OIIO::TypeDesc format, void* result)
-        -> bool;
+        CPPMM_RENAME(get_texels_from_handle);
+
     auto invalidate(OIIO::ustring filename, bool force) -> void;
     auto invalidate_all(bool force) -> void;
     auto close(OIIO::ustring filename) -> void;
     auto close_all() -> void;
-    auto geterror() const -> std::string;
+
+    virtual bool has_error() const = 0;
+    auto geterror(bool clear) const -> std::string;
     auto getstats(int level, bool icstats) const -> std::string;
     auto reset_stats() -> void;
     auto imagecache() const -> OIIO::ImageCache*;

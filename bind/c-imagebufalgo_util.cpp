@@ -13,17 +13,21 @@ template <typename Func>
 void parallel_image(Func f, OIIO::ROI roi, int nthreads,
                     OIIO::SplitDir splitdir) CPPMM_IGNORE;
 
+CPPMM_IGNORE
 auto IBAprep(OIIO::ROI& roi, OIIO::ImageBuf* dst, const OIIO::ImageBuf* A,
              const OIIO::ImageBuf* B, const OIIO::ImageBuf* C,
              OIIO::ImageSpec* force_spec, int prepflags) -> bool;
 
+CPPMM_IGNORE
 auto IBAprep(OIIO::ROI& roi, OIIO::ImageBuf* dst, const OIIO::ImageBuf* A,
              const OIIO::ImageBuf* B, OIIO::ImageSpec* force_spec,
              int prepflags) -> bool;
 
+CPPMM_IGNORE
 auto IBAprep(OIIO::ROI& roi, OIIO::ImageBuf* dst, const OIIO::ImageBuf* A,
              const OIIO::ImageBuf* B, int prepflags) -> bool;
 
+CPPMM_IGNORE
 auto IBAprep(OIIO::ROI& roi, OIIO::ImageBuf* dst, const OIIO::ImageBuf* A,
              int prepflags) -> bool;
 
@@ -45,11 +49,14 @@ enum IBAprep_flags {
     IBAprep_MERGE_METADATA = 65536,
 };
 
+CPPMM_IGNORE
 auto type_merge(OIIO::TypeDesc::BASETYPE a, OIIO::TypeDesc::BASETYPE b)
     -> OIIO::TypeDesc::BASETYPE;
 
+CPPMM_IGNORE
 auto type_merge(OIIO::TypeDesc a, OIIO::TypeDesc b) -> OIIO::TypeDesc;
 
+CPPMM_IGNORE
 auto type_merge(OIIO::TypeDesc a, OIIO::TypeDesc b, OIIO::TypeDesc c)
     -> OIIO::TypeDesc;
 

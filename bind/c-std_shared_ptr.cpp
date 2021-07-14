@@ -1,6 +1,6 @@
 #include <memory>
 
-#include <OpenImageIO/imageio.h>
+#include <OpenImageIO/color.h>
 
 // CPPMM_ macro definitions etc automatically inserted in this virtual header
 #include <cppmm_bind.hpp>
@@ -15,27 +15,23 @@ namespace std = ::std::_LIBCPP_ABI_NAMESPACE;
 namespace std = ::std;
 #endif
 
-template <class T> class unique_ptr {
+template <class T> class shared_ptr {
 public:
     // This allows us to see through to the type in Imath
-    using BoundType = ::std::unique_ptr<T>;
+    using BoundType = ::std::shared_ptr<T>;
 
     T* get();
 
-    ~unique_ptr() CPPMM_RENAME(dtor);
+    ~shared_ptr() CPPMM_RENAME(dtor);
 
 } CPPMM_OPAQUEPTR CPPMM_IGNORE_UNBOUND;
 
 // explicit instantiation
-template class unique_ptr<OIIO::ImageInput>;
-using ImageInputPtr = ::std::unique_ptr<OIIO::ImageInput>;
-
-template class unique_ptr<OIIO::ImageOutput>;
-using ImageOutputPtr = ::std::unique_ptr<OIIO::ImageOutput>;
+template class shared_ptr<OIIO::ColorProcessor>;
+using ColorProcessorHandle = ::std::shared_ptr<OIIO::ColorProcessor>;
 
 } // namespace std
 
 } // namespace cppmm_bind
 
-template class std::unique_ptr<OIIO::ImageInput>;
-template class std::unique_ptr<OIIO::ImageOutput>;
+template class std::shared_ptr<OIIO::ColorProcessor>;

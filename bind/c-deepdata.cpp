@@ -77,7 +77,7 @@ struct DeepData {
         -> void;
     auto opaque_z(long pixel) const -> float;
     auto occlusion_cull(long pixel) -> void;
-} CPPMM_OPAQUEBYTES; // struct DeepData
+} CPPMM_OPAQUEPTR; // struct DeepData
 
 } // namespace OIIO_NAMESPACE
 
