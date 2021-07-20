@@ -24,6 +24,7 @@ public:
     using BoundType = std::vector<T>;
 
     vector() CPPMM_RENAME(ctor);
+    vector(const std::vector<T>& rhs);
     ~vector();
 
     T* data();
@@ -63,8 +64,8 @@ template class vector<int>;
 using vector_int = ::std::vector<int>;
 
 // can't do this yet
-template class vector<void*>;
-using vector_voidptr = ::std::vector<void*>;
+// template class vector<void*>;
+// using vector_voidptr = ::std::vector<void*>;
 
 template class vector<OIIO::TypeDesc>;
 using vector_typedesc = ::std::vector<OIIO::TypeDesc>;
@@ -81,5 +82,5 @@ template class std::vector<unsigned char>;
 template class std::vector<float>;
 template class std::vector<unsigned long>;
 template class std::vector<int>;
-template class std::vector<void*>;
+// template class std::vector<void*>;
 template class std::vector<OIIO::TypeDesc>;

@@ -20,6 +20,8 @@ public:
     // This allows us to see through to the type in Imath
     using BoundType = ::std::shared_ptr<T>;
 
+    shared_ptr(const std::shared_ptr<T>& rhs);
+
     T* get();
 
     ~shared_ptr() CPPMM_RENAME(dtor);

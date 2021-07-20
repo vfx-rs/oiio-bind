@@ -84,7 +84,7 @@ struct TypeDesc {
         STRING = 13,
         PTR = 14,
         LASTBASE = 15,
-    };
+    } CPPMM_RUSTIFY_ENUM;
 
     enum AGGREGATE {
         SCALAR = 1,
@@ -93,7 +93,7 @@ struct TypeDesc {
         VEC4 = 4,
         MATRIX33 = 9,
         MATRIX44 = 16,
-    };
+    } CPPMM_RUSTIFY_ENUM;
 
     enum VECSEMANTICS {
         NOXFORM = 0,
@@ -105,7 +105,7 @@ struct TypeDesc {
         TIMECODE = 5,
         KEYCODE = 6,
         RATIONAL = 7,
-    };
+    } CPPMM_RUSTIFY_ENUM;
 } CPPMM_VALUETYPE; // struct TypeDesc
 
 } // namespace OIIO_NAMESPACE

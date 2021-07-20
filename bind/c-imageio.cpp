@@ -12,9 +12,10 @@ using ProgressCallback = OIIO::ProgressCallback;
 struct ROI {
     using BoundType = OIIO::ROI;
 
-    ROI() CPPMM_RENAME(default);
+    ROI() CPPMM_IGNORE;
     ROI(int xbegin, int xend, int ybegin, int yend, int zbegin, int zend,
-        int chbegin, int chend);
+        int chbegin, int chend)
+    CPPMM_IGNORE;
     auto defined() const -> bool;
     auto width() const -> int;
     auto height() const -> int;
@@ -30,8 +31,8 @@ struct ROI {
 
     CPPMM_IGNORE
     ROI(OIIO::ROI&&);
-    ~ROI();
-} CPPMM_OPAQUEBYTES; // struct ROI
+    ~ROI() CPPMM_IGNORE;
+} CPPMM_VALUETYPE; // struct ROI
 
 auto roi_union(const OIIO::ROI& A, const OIIO::ROI& B) -> OIIO::ROI;
 
@@ -47,7 +48,8 @@ struct ImageSpec {
     CPPMM_RENAME(from_roi)
     ImageSpec(const OIIO::ROI& roi, OIIO::TypeDesc fmt);
 
-    auto set_format(OIIO::TypeDesc fmt) -> void;
+    auto set_format(OIIO::TypeDesc fmt)
+        -> void CPPMM_RENAME(set_format_and_clear);
     auto default_channel_names() -> void;
     auto channel_bytes() const -> unsigned long;
 
@@ -144,9 +146,9 @@ struct ImageSpec {
                           int zbegin, int zend) -> bool;
     auto channelformat(int chan) const -> OIIO::TypeDesc;
     auto channel_name(int chan) const -> OIIO::string_view;
-    auto get_channelformats(std::vector<OIIO::TypeDesc>& formats)
+    auto get_channelformats(std::vector<OIIO::TypeDesc>& formats) const
+        -> void CPPMM_RENAME(get_channelformats_into);
 
-        const -> void;
     auto channelindex(OIIO::string_view name) const -> int;
     auto roi() const -> OIIO::ROI;
     auto roi_full() const -> OIIO::ROI;
@@ -181,7 +183,13 @@ struct ImageSpec {
         SerialDetailed = 1,
         SerialDetailedHuman = 2,
     };
-} CPPMM_OPAQUEPTR; // struct ImageSpec
+} CPPMM_OPAQUEPTR CPPMM_PROPERTIES(x; y; z; width; height; depth; full_x;
+                                   full_y; full_z; full_width; full_height;
+                                   full_depth; tile_width; tile_height;
+                                   tile_depth; nchannels; format;
+                                   channelformats; channelnames; alpha_channel;
+                                   z_channel; deep;
+                                   extra_attribs); // struct ImageSpec
 
 struct ImageInput {
     using BoundType = OIIO::ImageInput;
@@ -466,7 +474,7 @@ struct ImageOutput {
 
 auto openimageio_version() -> int;
 
-auto geterror() -> std::string;
+auto geterror(bool clear) -> std::string;
 
 auto attribute(OIIO::string_view name, OIIO::TypeDesc type, const void* val)
     -> bool;

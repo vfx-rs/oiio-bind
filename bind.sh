@@ -17,7 +17,8 @@ astgen bind -u -v 2 \
     -I${OPENEXR_ROOT}/include \
     -I${IMATH_ROOT}/include
 
-asttoc build/ast -v 3 -o build -p oiio \
+asttoc build/ast -v 2 -o build -p oiio \
     -L $OIIO_ROOT/lib \
     -l OpenImageIO \
+    -l OpenImageIO_Util \
     -major 2 -minor 3 -patch 6

@@ -171,7 +171,7 @@ struct ImageCache {
     auto geterror(bool clear) const -> std::string;
     auto getstats(int level) const -> std::string;
     auto reset_stats() -> void;
-    ~ImageCache();
+    ~ImageCache() CPPMM_IGNORE;
     auto operator=(const OIIO::ImageCache& rhs) -> OIIO::ImageCache&;
 } CPPMM_OPAQUEPTR; // struct ImageCache
 

@@ -1,1 +1,3 @@
 /build
+/oiio-rs/target
+/oiio-rs/Cargo.lock

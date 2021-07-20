@@ -64,8 +64,10 @@ struct DeepData {
     auto all_channeltypes() const -> OIIO::span<const OIIO::TypeDesc, -1>;
     auto all_samples() const -> OIIO::span<const unsigned int, -1>;
     auto all_data() const -> OIIO::span<const char, -1>;
-    auto get_pointers(std::vector<void*, std::allocator<void*>>& pointers) const
-        -> void;
+
+    CPPMM_IGNORE
+    auto get_pointers(std::vector<void*>& pointers) const -> void;
+
     auto copy_deep_sample(long pixel, int sample, const OIIO::DeepData& src,
                           long srcpixel, int srcsample) -> bool;
     auto copy_deep_pixel(long pixel, const OIIO::DeepData& src, long srcpixel)

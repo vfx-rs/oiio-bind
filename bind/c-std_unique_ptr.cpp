@@ -20,11 +20,10 @@ public:
     // This allows us to see through to the type in Imath
     using BoundType = ::std::unique_ptr<T>;
 
-    T* get();
-
+    T* get() const;
     ~unique_ptr() CPPMM_RENAME(dtor);
 
-} CPPMM_OPAQUEPTR CPPMM_IGNORE_UNBOUND;
+} CPPMM_OPAQUEBYTES CPPMM_IGNORE_UNBOUND;
 
 // explicit instantiation
 template class unique_ptr<OIIO::ImageInput>;

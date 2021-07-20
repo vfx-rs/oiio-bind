@@ -158,8 +158,10 @@ struct IOProxy {
     template <typename T> auto read(OIIO::span<T, -1> buf) -> unsigned long;
     template <typename T> auto write(OIIO::span<T, -1> buf) -> unsigned long;
 
-    unsigned long write(OIIO::string_view buf) CPPMM_RENAME(write_string_view);
-    bool seek(long offset, int origin) CPPMM_RENAME(seek_with_origin);
+    CPPMM_RENAME(write_string_view)
+    CPPMM_IGNORE auto write(OIIO::string_view buf) -> unsigned long;
+    bool seek(long offset, int origin)
+        CPPMM_RENAME(seek_with_origin) CPPMM_IGNORE;
 
     auto error() const -> std::string;
 
@@ -186,12 +188,14 @@ struct IOFile {
     auto opened() const -> bool;
     auto tell() -> long;
     auto seek(long offset) -> bool;
-    bool seek(long offset, int origin) CPPMM_RENAME(seek_with_origin);
     auto read(void* buf, unsigned long size) -> unsigned long;
     auto write(const void* buf, unsigned long size) -> unsigned long;
 
     CPPMM_RENAME(write_string_view)
-    auto write(OIIO::string_view buf) -> unsigned long;
+    CPPMM_IGNORE auto write(OIIO::string_view buf) -> unsigned long;
+    bool seek(long offset, int origin)
+        CPPMM_RENAME(seek_with_origin) CPPMM_IGNORE;
+
     auto pread(void* buf, unsigned long size, long offset) -> unsigned long;
     auto pwrite(const void* buf, unsigned long size, long offset)
         -> unsigned long;
@@ -229,7 +233,6 @@ struct IOVecOutput {
     auto seek(long offset) -> bool;
     auto read(void* buf, unsigned long size) -> unsigned long;
     auto write(const void* buf, unsigned long size) -> unsigned long;
-    unsigned long write(OIIO::string_view buf) CPPMM_RENAME(write_string_view);
     auto pread(void* buf, unsigned long size, long offset) -> unsigned long;
     auto pwrite(const void* buf, unsigned long size, long offset)
         -> unsigned long;
@@ -240,7 +243,10 @@ struct IOVecOutput {
     template <typename T> auto read(OIIO::span<T, -1> buf) -> unsigned long;
     template <typename T> auto write(OIIO::span<T, -1> buf) -> unsigned long;
 
-    bool seek(long offset, int origin) CPPMM_RENAME(seek_with_origin);
+    CPPMM_RENAME(write_string_view)
+    CPPMM_IGNORE auto write(OIIO::string_view buf) -> unsigned long;
+    bool seek(long offset, int origin)
+        CPPMM_RENAME(seek_with_origin) CPPMM_IGNORE;
 
     CPPMM_RENAME(error_const)
     auto error() const -> std::string;
@@ -261,10 +267,8 @@ struct IOMemReader {
     auto opened() const -> bool;
     auto tell() -> long;
     auto seek(long offset) -> bool;
-    bool seek(long offset, int origin) CPPMM_RENAME(seek_with_origin);
     auto read(void* buf, unsigned long size) -> unsigned long;
     auto write(const void* buf, unsigned long size) -> unsigned long;
-    unsigned long write(OIIO::string_view buf) CPPMM_RENAME(write_string_view);
     auto pread(void* buf, unsigned long size, long offset) -> unsigned long;
     auto pwrite(const void* buf, unsigned long size, long offset)
         -> unsigned long;
@@ -275,6 +279,11 @@ struct IOMemReader {
     template <typename T> auto read(OIIO::span<T, -1> buf) -> unsigned long;
     template <typename T> auto write(OIIO::span<T, -1> buf) -> unsigned long;
     auto error() const -> std::string;
+
+    CPPMM_RENAME(write_string_view)
+    CPPMM_IGNORE auto write(OIIO::string_view buf) -> unsigned long;
+    bool seek(long offset, int origin)
+        CPPMM_RENAME(seek_with_origin) CPPMM_IGNORE;
 
     CPPMM_IGNORE
     auto error(OIIO::string_view e) -> void;

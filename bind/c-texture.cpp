@@ -467,7 +467,7 @@ struct TextureSystem {
     auto getstats(int level, bool icstats) const -> std::string;
     auto reset_stats() -> void;
     auto imagecache() const -> OIIO::ImageCache*;
-    ~TextureSystem();
+    ~TextureSystem() CPPMM_IGNORE;
 } CPPMM_OPAQUEPTR; // struct TextureSystem
 
 } // namespace OIIO_NAMESPACE
