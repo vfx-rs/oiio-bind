@@ -48,8 +48,8 @@ struct ImageSpec {
     CPPMM_RENAME(from_roi)
     ImageSpec(const OIIO::ROI& roi, OIIO::TypeDesc fmt);
 
-    auto set_format(OIIO::TypeDesc fmt)
-        -> void CPPMM_RENAME(set_format_and_clear);
+    CPPMM_RENAME(set_format_and_clear)
+    auto set_format(OIIO::TypeDesc fmt) -> void;
     auto default_channel_names() -> void;
     auto channel_bytes() const -> unsigned long;
 
@@ -146,8 +146,9 @@ struct ImageSpec {
                           int zbegin, int zend) -> bool;
     auto channelformat(int chan) const -> OIIO::TypeDesc;
     auto channel_name(int chan) const -> OIIO::string_view;
-    auto get_channelformats(std::vector<OIIO::TypeDesc>& formats) const
-        -> void CPPMM_RENAME(get_channelformats_into);
+
+    CPPMM_RENAME(get_channelformats_into)
+    auto get_channelformats(std::vector<OIIO::TypeDesc>& formats) const -> void;
 
     auto channelindex(OIIO::string_view name) const -> int;
     auto roi() const -> OIIO::ROI;
@@ -410,11 +411,10 @@ struct ImageOutput {
     auto format_name() const -> const char*;
     auto supports(OIIO::string_view feature) const -> int;
 
-    CPPMM_RENAME(open_in)
     auto open(const std::string& name, const OIIO::ImageSpec& newspec,
               OIIO::ImageOutput::OpenMode mode) -> bool;
 
-    CPPMM_RENAME(open_subimage_in)
+    CPPMM_RENAME(open_subimage)
     auto open(const std::string& name, int subimages,
               const OIIO::ImageSpec* specs) -> bool;
 

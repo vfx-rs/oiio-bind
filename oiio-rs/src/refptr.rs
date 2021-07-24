@@ -114,3 +114,15 @@ where
         }
     }
 }
+
+impl<'a, P> AsRef<P::Pointee> for Ref<'a, P>
+where
+    P: OpaquePtr,
+{
+    fn as_ref(&self) -> &P::Pointee {
+        unsafe {
+            &*(&self.ptr as *const *const <P as OpaquePtr>::SysPointee
+                as *const <P as OpaquePtr>::Pointee)
+        }
+    }
+}

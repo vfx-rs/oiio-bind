@@ -2,6 +2,7 @@ use oiio_sys as sys;
 use std::ffi::{CStr, CString};
 
 use crate::refptr::{OpaquePtr, Ref, RefMut};
+use crate::typedesc::TypeDesc;
 
 #[repr(transparent)]
 pub struct CppString(pub(crate) *mut sys::std_string_t);
@@ -178,5 +179,74 @@ impl CppVectorString {
 impl Default for CppVectorString {
     fn default() -> Self {
         CppVectorString::new()
+    }
+}
+
+#[repr(transparent)]
+pub struct CppVectorTypeDesc(pub(crate) *mut sys::std_vector_typedesc_t);
+
+unsafe impl OpaquePtr for CppVectorTypeDesc {
+    type SysPointee = sys::std_vector_typedesc_t;
+    type Pointee = CppVectorTypeDesc;
+}
+
+pub type CppVectorTypeDescRef<'a, P = CppVectorTypeDesc> = Ref<'a, P>;
+pub type CppVectorTypeDescRefMut<'a, P = CppVectorTypeDesc> = RefMut<'a, P>;
+
+impl CppVectorTypeDesc {
+    pub fn new() -> CppVectorTypeDesc {
+        let mut ptr = std::ptr::null_mut();
+        unsafe {
+            sys::std_vector_typedesc_ctor(&mut ptr)
+                .into_result()
+                .unwrap();
+        }
+        CppVectorTypeDesc(ptr)
+    }
+
+    pub fn from_slice(vec: &[TypeDesc]) -> CppVectorTypeDesc {
+        let mut ptr = std::ptr::null_mut();
+        unsafe {
+            sys::std_vector_typedesc_ctor(&mut ptr)
+                .into_result()
+                .unwrap();
+
+            for rs in vec {
+                sys::std_vector_typedesc_push_back(
+                    ptr,
+                    rs as *const TypeDesc as *const sys::OIIO_TypeDesc_t,
+                )
+                .into_result()
+                .unwrap();
+            }
+        }
+
+        CppVectorTypeDesc(ptr)
+    }
+
+    pub fn as_slice(&self) -> &[TypeDesc] {
+        let mut size = 0;
+        let mut ptr = std::ptr::null();
+        unsafe {
+            sys::std_vector_typedesc_size(self.0, &mut size);
+            sys::std_vector_typedesc_data_const(self.0, &mut ptr);
+            std::slice::from_raw_parts(ptr as *const TypeDesc, size as usize)
+        }
+    }
+
+    pub fn as_slice_mut(&mut self) -> &mut [TypeDesc] {
+        let mut size = 0;
+        let mut ptr = std::ptr::null_mut();
+        unsafe {
+            sys::std_vector_typedesc_size(self.0, &mut size);
+            sys::std_vector_typedesc_data(self.0, &mut ptr);
+            std::slice::from_raw_parts_mut(ptr as *mut TypeDesc, size as usize)
+        }
+    }
+}
+
+impl Default for CppVectorTypeDesc {
+    fn default() -> Self {
+        CppVectorTypeDesc::new()
     }
 }

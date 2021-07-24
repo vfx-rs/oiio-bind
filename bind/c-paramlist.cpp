@@ -107,7 +107,7 @@ struct ParamValue {
         INTERP_VERTEX = 3,
     };
 
-} CPPMM_OPAQUEPTR; // struct ParamValue
+} CPPMM_OPAQUEBYTES; // struct ParamValue
 
 struct ParamValueList {
     using BoundType = OIIO::ParamValueList;
