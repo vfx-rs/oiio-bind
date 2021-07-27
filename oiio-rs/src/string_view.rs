@@ -18,3 +18,9 @@ impl From<&str> for StringView {
         }
     }
 }
+
+impl From<StringView> for sys::OIIO_string_view_t {
+    fn from(s: StringView) -> Self {
+        s.0
+    }
+}

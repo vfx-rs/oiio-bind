@@ -1,6 +1,8 @@
 pub mod cppstd;
 pub mod error;
 pub mod filesystem;
+pub mod imagebuf;
+pub mod imagecache;
 pub mod imageio;
 pub mod param_list;
 pub mod prelude;

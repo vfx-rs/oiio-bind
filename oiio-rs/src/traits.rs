@@ -6,7 +6,7 @@ use half::f16;
 use std::ffi::CString;
 use std::os::raw::c_void;
 
-pub trait Pixel {
+pub trait Pixel: Clone {
     const FORMAT: TypeDesc;
 }
 

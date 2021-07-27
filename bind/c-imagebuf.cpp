@@ -75,7 +75,7 @@ struct ImageBuf {
               OIIO::ProgressCallback progress_callback,
               void* progress_callback_data) -> bool;
 
-    CPPMM_RENAME(read_with_channels)
+    CPPMM_RENAME(read_channels)
     auto read(int subimage, int miplevel, int chbegin, int chend, bool force,
               OIIO::TypeDesc convert, OIIO::ProgressCallback progress_callback,
               void* progress_callback_data) -> bool;

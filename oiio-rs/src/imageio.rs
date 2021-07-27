@@ -18,7 +18,7 @@ use std::path::Path;
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[repr(transparent)]
-pub struct Stride(i64);
+pub struct Stride(pub i64);
 
 impl Stride {
     pub const AUTO: Stride = Stride(std::i64::MIN);
@@ -35,7 +35,47 @@ impl ImageSize {
 /// with the "end" designators signifying one past the last pixel in each
 /// dimension, a la STL style.
 ///
-pub use sys::OIIO_ROI_t as Roi;
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub struct Roi {
+    pub xbegin: i32,
+    pub xend: i32,
+    pub ybegin: i32,
+    pub yend: i32,
+    pub zbegin: i32,
+    pub zend: i32,
+    pub chbegin: i32,
+    pub chend: i32,
+}
+
+impl Default for Roi {
+    fn default() -> Self {
+        Roi {
+            xbegin: std::i32::MIN,
+            xend: 0,
+            ybegin: 0,
+            yend: 0,
+            zbegin: 0,
+            zend: 0,
+            chbegin: 0,
+            chend: 0,
+        }
+    }
+}
+
+impl From<Roi> for sys::OIIO_ROI_t {
+    fn from(r: Roi) -> Self {
+        sys::OIIO_ROI_t {
+            xbegin: r.xbegin,
+            xend: r.xend,
+            ybegin: r.ybegin,
+            yend: r.yend,
+            zbegin: r.zbegin,
+            zend: r.zend,
+            chbegin: r.chbegin,
+            chend: r.chend,
+        }
+    }
+}
 
 #[repr(transparent)]
 pub struct ImageSpec(pub(crate) *mut sys::OIIO_ImageSpec_t);
@@ -97,7 +137,11 @@ impl ImageSpec {
     pub fn from_roi(roi: &Roi, format: TypeDesc) -> Self {
         let mut inner = std::ptr::null_mut();
         unsafe {
-            sys::OIIO_ImageSpec_from_roi(&mut inner, roi, format.into());
+            sys::OIIO_ImageSpec_from_roi(
+                &mut inner,
+                roi as *const Roi as *const sys::OIIO_ROI_t,
+                format.into(),
+            );
         }
 
         ImageSpec(inner)
@@ -844,6 +888,8 @@ impl Clone for ImageSpec {
     }
 }
 
+/// ImageInput can read any format that OIIO or its plugins support
+///
 pub struct ImageInput {
     pub(crate) uptr: sys::std_ImageInputPtr_t,
     pub(crate) ptr: *mut sys::OIIO_ImageInput_t,
@@ -1223,31 +1269,96 @@ impl ImageInput {
         }
 
         unsafe {
-            let mut result = false;
-            sys::OIIO_ImageInput_read_image(
-                self.ptr,
-                &mut result,
+            self._read_image_impl(
                 read_options.subimage,
                 read_options.miplevel,
                 read_options.chbegin,
                 chend,
                 T::FORMAT.into(),
                 pixels.as_mut_ptr() as *mut std::os::raw::c_void,
-                read_options.x_stride.0,
-                read_options.y_stride.0,
-                read_options.z_stride.0,
-                std::mem::transmute::<
-                    *const (),
-                    extern "C" fn(*mut std::os::raw::c_void, f32) -> bool,
-                >(std::ptr::null()),
+                read_options.x_stride,
+                read_options.y_stride,
+                read_options.z_stride,
+                std::mem::transmute::<*const (), ProgressCallback>(
+                    std::ptr::null(),
+                ),
                 std::ptr::null_mut(),
-            );
+            )
+        }
+    }
 
-            if !result {
-                let mut msg = CppString::new("");
-                sys::OIIO_ImageInput_geterror(self.ptr, &mut msg.0, true);
-                return Err(Error::Oiio(msg.as_str().to_string()));
-            }
+    pub fn read_image_with_progress<T: Pixel, F: FnMut(f32) -> bool>(
+        &mut self,
+        pixels: &mut [T],
+        read_options: ReadOptions,
+        progress_callback: F,
+    ) -> Result<()> {
+        let spec = self.spec();
+        let chend = read_options
+            .chend
+            .clamp(read_options.chbegin + 1, spec.nchannels());
+        let nchannels = chend - read_options.chbegin;
+        let num_pixels = spec.width() * spec.height() * nchannels;
+
+        if pixels.len() < num_pixels as usize {
+            return Err(Error::BufferTooSmall);
+        }
+
+        let mut progress_callback = progress_callback;
+        let trampoline = get_trampoline(&progress_callback);
+
+        unsafe {
+            self._read_image_impl(
+                read_options.subimage,
+                read_options.miplevel,
+                read_options.chbegin,
+                chend,
+                T::FORMAT.into(),
+                pixels.as_mut_ptr() as *mut std::os::raw::c_void,
+                read_options.x_stride,
+                read_options.y_stride,
+                read_options.z_stride,
+                trampoline,
+                &mut progress_callback as *mut _ as *mut c_void,
+            )
+        }
+    }
+
+    unsafe fn _read_image_impl(
+        &mut self,
+        subimage: i32,
+        miplevel: i32,
+        chbegin: i32,
+        chend: i32,
+        format: TypeDesc,
+        pixels: *mut c_void,
+        x_stride: Stride,
+        y_stride: Stride,
+        z_stride: Stride,
+        progress_callback: ProgressCallback,
+        progress_callback_data: *mut c_void,
+    ) -> Result<()> {
+        let mut result = false;
+        sys::OIIO_ImageInput_read_image(
+            self.ptr,
+            &mut result,
+            subimage,
+            miplevel,
+            chbegin,
+            chend,
+            format.into(),
+            pixels,
+            x_stride.0,
+            y_stride.0,
+            z_stride.0,
+            progress_callback,
+            progress_callback_data,
+        );
+
+        if !result {
+            let mut msg = CppString::new("");
+            sys::OIIO_ImageInput_geterror(self.ptr, &mut msg.0, true);
+            return Err(Error::Oiio(msg.as_str().to_string()));
         }
 
         Ok(())
@@ -1255,6 +1366,26 @@ impl ImageInput {
 }
 
 pub type ProgressCallback = extern "C" fn(*mut c_void, f32) -> bool;
+
+pub(crate) extern "C" fn progress_tramp<F>(
+    user_data: *mut c_void,
+    progress: f32,
+) -> bool
+where
+    F: FnMut(f32) -> bool,
+{
+    unsafe {
+        let user_data = &mut *(user_data as *mut F);
+        user_data(progress)
+    }
+}
+
+pub fn get_trampoline<F>(_closure: &F) -> ProgressCallback
+where
+    F: FnMut(f32) -> bool,
+{
+    progress_tramp::<F>
+}
 
 pub struct ReadOptions {
     pub subimage: i32,
@@ -1299,6 +1430,18 @@ impl Drop for ImageOutputPtr {
     }
 }
 
+/// ImageOutputBase is equivalent to ImageOutput in the C++ library.
+///
+/// We use the typestate pattern here to make invalid sequences of API calls
+/// impossible under the type system. For instance, creating an ImageOutput with create(), then
+/// attempting to call any of the write() methods on it will lead to a SIGFPE at best.
+/// So we move the writing methods to [`ImageOutputBase<ImageOutputStateOpened>`], which can only be
+/// created by calling open(), at which point the write() methods are valid to call.
+///
+/// We use a type alias:
+/// `pub type ImageOutput = ImageOutputBase<ImageOutputStateClosed>` to keep the API looking the
+/// same when reading the code.
+///
 pub struct ImageOutputBase<S: ImageOutputState> {
     pub(crate) uptr: ImageOutputPtr,
     pub(crate) ptr: *mut sys::OIIO_ImageOutput_t,
@@ -1423,6 +1566,12 @@ where
         }
     }
 
+    /// Create a new ImageOutput, opening the file at `filename` with `spec` and
+    /// `mode`.
+    ///
+    /// This is equivalent to calling [`create()`](ImageOutputBase::create) and then
+    /// [`open()`](ImageOutputBase::open)
+    ///
     pub fn new<P: AsRef<Path>>(
         filename: P,
         spec: &ImageSpec,
@@ -1731,7 +1880,14 @@ mod test {
                 as usize
         ];
 
-        ii.read_image(&mut pixels, ReadOptions::default())?;
+        ii.read_image_with_progress(
+            &mut pixels,
+            ReadOptions::default(),
+            |progress: f32| {
+                println!("Progress: {}", progress);
+                false
+            },
+        )?;
 
         Ok(())
     }
