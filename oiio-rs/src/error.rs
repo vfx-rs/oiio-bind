@@ -10,4 +10,6 @@ pub enum Error {
     InvalidHandle,
     #[error("The provided ImageSpec did not specify a valid image")]
     InvalidSpec,
+    #[error("The provided TypeDesc format is not supported")]
+    InvalidFormat(crate::typedesc::TypeDesc),
 }

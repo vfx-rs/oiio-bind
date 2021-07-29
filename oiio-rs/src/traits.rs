@@ -1,5 +1,6 @@
 use crate::string_view::StringView;
 use crate::typedesc::{Aggregate, BaseType, TypeDesc, VecSemantics};
+use crate::ustring::UString;
 use oiio_sys as sys;
 
 use half::f16;
@@ -42,9 +43,10 @@ impl Pixel for f32 {
     const FORMAT: TypeDesc = TypeDesc::FLOAT;
 }
 
-pub trait AttributeMetadata {
+pub trait AttributeMetadata: Default {
     const TYPE: TypeDesc;
     unsafe fn ptr(&self) -> *const c_void;
+    unsafe fn ptr_mut(&mut self) -> *mut c_void;
 }
 
 impl AttributeMetadata for i32 {
@@ -52,18 +54,8 @@ impl AttributeMetadata for i32 {
     unsafe fn ptr(&self) -> *const c_void {
         self as *const Self as *const c_void
     }
-}
-
-impl<const N: usize> AttributeMetadata for [i32; N] {
-    const TYPE: TypeDesc = TypeDesc::new(
-        BaseType::Int32,
-        Aggregate::Scalar,
-        VecSemantics::NoSemantics,
-        N as i32,
-    );
-
-    unsafe fn ptr(&self) -> *const c_void {
-        self.as_ptr() as *const c_void
+    unsafe fn ptr_mut(&mut self) -> *mut c_void {
+        self as *mut Self as *mut c_void
     }
 }
 
@@ -72,9 +64,12 @@ impl AttributeMetadata for f32 {
     unsafe fn ptr(&self) -> *const c_void {
         self as *const Self as *const c_void
     }
+    unsafe fn ptr_mut(&mut self) -> *mut c_void {
+        self as *mut Self as *mut c_void
+    }
 }
 
-impl<const N: usize> AttributeMetadata for [f32; N] {
+impl<const N: usize> AttributeMetadata for [f32; N] where [f32; N]: Default {
     const TYPE: TypeDesc = TypeDesc::new(
         BaseType::Float,
         Aggregate::Scalar,
@@ -85,18 +80,63 @@ impl<const N: usize> AttributeMetadata for [f32; N] {
     unsafe fn ptr(&self) -> *const c_void {
         self.as_ptr() as *const c_void
     }
+    unsafe fn ptr_mut(&mut self) -> *mut c_void {
+        self.as_mut_ptr() as *mut c_void
+    }
 }
 
-impl AttributeMetadata for CString {
-    const TYPE: TypeDesc = TypeDesc::STRING;
+impl<const N: usize> AttributeMetadata for [i32; N] where [i32; N]: Default {
+    const TYPE: TypeDesc = TypeDesc::new(
+        BaseType::Int32,
+        Aggregate::Scalar,
+        VecSemantics::NoSemantics,
+        N as i32,
+    );
+
     unsafe fn ptr(&self) -> *const c_void {
         self.as_ptr() as *const c_void
     }
-}
-
-impl AttributeMetadata for StringView {
-    const TYPE: TypeDesc = TypeDesc::STRING;
-    unsafe fn ptr(&self) -> *const c_void {
-        &self.0 as *const sys::OIIO_string_view_t as *const c_void
+    unsafe fn ptr_mut(&mut self) -> *mut c_void {
+        self.as_mut_ptr() as *mut c_void
     }
 }
+
+impl AttributeMetadata for UString {
+    const TYPE: TypeDesc = TypeDesc::STRING;
+    unsafe fn ptr(&self) -> *const c_void {
+        self as *const UString as *const c_void
+    }
+    unsafe fn ptr_mut(&mut self) -> *mut c_void {
+        self as *mut UString as *mut c_void
+    }
+}
+
+impl<const N: usize> AttributeMetadata for [UString; N] where [UString; N]: Default {
+    const TYPE: TypeDesc = TypeDesc::new(
+        BaseType::String,
+        Aggregate::Scalar,
+        VecSemantics::NoSemantics,
+        N as i32,
+    );
+
+    unsafe fn ptr(&self) -> *const c_void {
+        self.as_ptr() as  *const c_void
+    }
+    unsafe fn ptr_mut(&mut self) -> *mut c_void {
+        self.as_mut_ptr() as *mut c_void
+    }
+}
+
+// impl AttributeMetadata for CString {
+//     const TYPE: TypeDesc = TypeDesc::STRING;
+//     unsafe fn ptr(&self) -> *const c_void {
+//         self.as_ptr() as *const c_void
+//     }
+// }
+// 
+// impl AttributeMetadata for StringView {
+//     const TYPE: TypeDesc = TypeDesc::STRING;
+//     unsafe fn ptr(&self) -> *const c_void {
+//         &self.0 as *const sys::OIIO_string_view_t as *const c_void
+//     }
+// }

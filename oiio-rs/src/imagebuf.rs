@@ -3,12 +3,13 @@ use crate::error::Error;
 use crate::filesystem::IOProxy;
 use crate::imagecache::ImageCache;
 use crate::imageio::{
-    get_trampoline, progress_tramp, ImageSpec, ProgressCallback, Stride,
+    get_trampoline, ImageOutputOpened, ImageSpec, ImageSpecRef,
+    ProgressCallback, Roi, Stride, Strides
 };
 use crate::typedesc::TypeDesc;
 
 use crate::string_view::StringView;
-use crate::traits::{AttributeMetadata, Pixel};
+use crate::traits::Pixel;
 
 use oiio_sys as sys;
 
@@ -85,11 +86,31 @@ pub struct ImageBuf {
     pub(crate) ptr: *mut sys::OIIO_ImageBuf_t,
 }
 
-pub enum ImageBufStorage {
+/// Describes the backing storage for an [`ImageBuf`]
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+pub enum Storage {
+    /// The ImageBuf hasn't been initialized yet so there is no storage
     Uninitialized,
+    /// The ImageBuf has allocated and owns the memory
     LocalBuffer,
+    /// The ImageBuf is wrapping a user-provided storage buffer
     AppBuffer,
+    /// The ImageBuf is backed by an ImageCache
     ImageCache,
+}
+
+impl From<sys::OIIO_ImageBuf_IBStorage> for Storage {
+    fn from(s: sys::OIIO_ImageBuf_IBStorage) -> Storage {
+        match s {
+            sys::OIIO_ImageBuf_IBStorage_UNINITIALIZED => {
+                Storage::Uninitialized
+            }
+            sys::OIIO_ImageBuf_IBStorage_LOCALBUFFER => Storage::LocalBuffer,
+            sys::OIIO_ImageBuf_IBStorage_APPBUFFER => Storage::AppBuffer,
+            sys::OIIO_ImageBuf_IBStorage_IMAGECACHE => Storage::ImageCache,
+            _ => panic!("bad value '{}' converting IBStorage", s.0),
+        }
+    }
 }
 
 impl ImageBuf {
@@ -613,12 +634,700 @@ impl ImageBuf {
 
         Ok(())
     }
+
+    /// Write the pixels of the ImageBuf to an [`ImageOutputOpened`]. The
+    /// ImageOutput must have already been opened with a spec that indicates
+    /// a resolution identical to that of this ImageBuf (but it may have
+    /// specified a different pixel data type, in which case data
+    /// conversions will happen automatically). This method does NOT close
+    /// the file when it's done (and so may be called in a loop to write a
+    /// multi-image file).
+    ///
+    /// Note that since this uses an already-opened `ImageOutput`, which is
+    /// too late to change how it was opened, it does not honor any prior
+    /// calls to `set_write_format` or `set_write_tiles`.
+    ///
+    /// The main application of this method is to allow an ImageBuf (which
+    /// by design may hold only a *single* image) to be used for the output
+    /// of one image of a multi-subimage and/or MIP-mapped image file.
+    ///
+    pub fn write_to(&mut self, io: &mut ImageOutputOpened) -> Result<()> {
+        let mut result = false;
+        unsafe {
+            sys::OIIO_ImageBuf_write_to_imageoutput(
+                self.ptr,
+                &mut result,
+                io.ptr,
+                std::mem::transmute::<*const (), ProgressCallback>(
+                    std::ptr::null(),
+                ),
+                std::ptr::null_mut(),
+            );
+        }
+
+        if !result {
+            return Err(Error::Oiio(self.get_error(true)));
+        }
+
+        Ok(())
+    }
+
+    /// Set the pixel data format that will be used for subsequent `write()`
+    /// calls that do not themselves request a specific data type request.
+    ///
+    /// Note that this does not affect the variety of `write()` that takes
+    /// an open `ImageOutput*` as a parameter.
+    ///
+    pub fn set_write_format(&mut self, format: TypeDesc) {
+        unsafe {
+            sys::OIIO_ImageBuf_set_write_format(self.ptr, format.into());
+        }
+    }
+
+    /// Set the per-channel pixel data format that will be used for
+    /// subsequent `write()` calls that do not themselves request a specific
+    /// data type request.
+    ///
+    /// # Parameters
+    /// *`formats` - The type of each channel (in order). Any channel's
+    /// format specified as [`TypeDesc::UNKNOWN`] will default to be
+    /// whatever type is described in the ImageSpec of the
+    /// buffer.
+    ///
+    pub fn set_channel_write_formats(&mut self, formats: &[TypeDesc]) {
+        unsafe {
+            let mut s = sys::OIIO_cspan_TypeDesc_t::default();
+            sys::OIIO_cspan_TypeDesc_from_ptr(
+                &mut s,
+                formats.as_ptr() as *const sys::OIIO_TypeDesc_t,
+                formats.len() as i64,
+            );
+            sys::OIIO_ImageBuf_set_write_format_per_channel(self.ptr, s);
+        }
+    }
+
+    /// Override the tile sizing for subsequent calls to the `write()`
+    /// method (the variety that does not take an open `ImageOutput*`).
+    /// Setting all three dimensions to 0 indicates that the output should
+    /// be a scanline-oriented file.
+    ///
+    /// This lets you write a tiled file from an ImageBuf that may have been
+    /// read originally from a scanline file, or change the dimensions of a
+    /// tiled file, or to force the file written to be scanline even if it
+    /// was originally read from a tiled file.
+    ///
+    /// In all cases, if the file format ultimately written does not support
+    /// tiling, or the tile dimensions requested, a suitable supported
+    /// tiling choice will be made automatically.
+    ///
+    pub fn set_write_tiles(&mut self, width: i32, height: i32, depth: i32) {
+        unsafe {
+            sys::OIIO_ImageBuf_set_write_tiles(self.ptr, width, height, depth);
+        }
+    }
+
+    /// Supply an IOProxy to use for a subsequent call to `write()`.
+    ///
+    /// If a proxy is set but it later turns out that the file format
+    /// selected does not support write proxies, then `write()` will fail
+    /// with an error.
+    ///
+    pub fn set_write_proxy(&mut self, ioproxy: IOProxy) {
+        unsafe {
+            sys::OIIO_ImageBuf_set_write_ioproxy(self.ptr, ioproxy.0);
+        }
+    }
+}
+
+impl ImageBuf {
+    //! # Copying
+
+    /// Copy all the metadata from `src` to `self` (except for pixel data
+    /// resolution, channel types and names, and data format).
+    ///
+    pub fn copy_metadata(&mut self, src: &ImageBuf) {
+        unsafe {
+            sys::OIIO_ImageBuf_copy_metadata(self.ptr, src.ptr);
+        }
+    }
+
+    /// Copy the pixel data from `src` to `self`, automatically converting
+    /// to the existing data format of `self`.  It only copies pixels in
+    /// the overlap regions (and channels) of the two images; pixel data in
+    /// `self` that do exist in `src` will be set to 0, and pixel data in
+    /// `src` that do not exist in `self` will not be copied.
+    ///
+    /// # Errors
+    /// * [`Error::Oiio`] - if any error occurs
+    ///
+    pub fn copy_pixels(&mut self, src: &ImageBuf) -> Result<()> {
+        let mut result = false;
+        unsafe {
+            sys::OIIO_ImageBuf_copy_pixels(self.ptr, &mut result, src.ptr);
+        }
+
+        if !result {
+            return Err(Error::Oiio(self.get_error(true)));
+        }
+
+        Ok(())
+    }
+
+    /// Return a clone of this ImageBuf, converting the pixel type to `convert`
+    ///
+    pub fn clone_convert(&self, convert: TypeDesc) -> ImageBuf {
+        let mut ptr = std::ptr::null_mut();
+        unsafe {
+            sys::OIIO_ImageBuf_clone(self.ptr, &mut ptr, convert.into());
+        }
+
+        ImageBuf { ptr }
+    }
+}
+
+impl ImageBuf {
+    //! # Getting and setting pixel values
+
+    /// Retrieve a single channel of one pixel.
+    ///
+    /// Retrieves channel `c` of pixel with corrdinates `[x, y, z]` and returns
+    /// its value as a f32. `mode` determines the behviour if the pixel coordinate
+    /// outside the data window.
+    ///
+    pub fn get_channel(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+        c: i32,
+        mode: WrapMode,
+    ) -> f32 {
+        let mut result = 0.0f32;
+        unsafe {
+            sys::OIIO_ImageBuf_getchannel(
+                self.ptr,
+                &mut result,
+                x,
+                y,
+                z,
+                c,
+                mode.into(),
+            );
+        }
+        result
+    }
+
+    /// Retrieve the pixel value at coordinates `[x, y, z]`, placing its
+    /// contents in `pixel[0..n-1]` where `n` is the smaller of
+    /// `maxchannels` and the actual number of channels stored in the buffer.
+    ///
+    /// # Panics
+    /// * if `pixel` is not long enough to hold the requested number of channels
+    ///
+    pub fn get_pixel(
+        &self,
+        x: i32,
+        y: i32,
+        z: i32,
+        pixel: &mut [f32],
+        maxchannels: Option<i32>,
+        mode: WrapMode,
+    ) {
+        let maxchannels = if let Some(maxchannels) = maxchannels {
+            maxchannels
+        } else {
+            std::i32::MAX
+        };
+        let n = self.num_channels().min(maxchannels);
+        if pixel.len() < n as usize {
+            panic!("getpixel called with slice of length {} but requested {} channels", pixel.len(), n);
+        }
+
+        unsafe {
+            sys::OIIO_ImageBuf_getpixel_3d(
+                self.ptr,
+                x,
+                y,
+                z,
+                pixel.as_mut_ptr(),
+                maxchannels,
+                mode.into(),
+            );
+        }
+    }
+
+    /// Sample the image plane at pixel coordinates `(x,y)`, using linear
+    /// interpolation between pixels, placing the result in `pixel[]`.
+    ///
+    /// # Panics
+    /// * if `pixel` is not long enough to hold all the channels.
+    ///
+    pub fn interp_pixel(
+        &self,
+        x: f32,
+        y: f32,
+        pixel: &mut [f32],
+        mode: WrapMode,
+    ) {
+        if pixel.len() < self.num_channels() as usize {
+            panic!("getpixel called with slice of length {} but requested {} channels", pixel.len(), self.num_channels());
+        }
+
+        unsafe {
+            sys::OIIO_ImageBuf_interppixel(
+                self.ptr,
+                x,
+                y,
+                pixel.as_mut_ptr(),
+                mode.into(),
+            );
+        }
+    }
+
+    /// Sample the image plane at NDC coordinates `(s,t)`, using linear
+    /// interpolation between pixels, placing the result in `pixel[]`.
+    ///
+    /// In NDC coordinates, `(0, 0)` is the upper-left corner of the display
+    /// window, and `(1, 1)` the lower-right.
+    ///
+    /// # Panics
+    /// * if `pixel` is not long enough to hold all the channels.
+    ///
+    pub fn interp_pixel_ndc(
+        &self,
+        s: f32,
+        t: f32,
+        pixel: &mut [f32],
+        mode: WrapMode,
+    ) {
+        if pixel.len() < self.num_channels() as usize {
+            panic!("getpixel called with slice of length {} but requested {} channels", pixel.len(), self.num_channels());
+        }
+
+        unsafe {
+            sys::OIIO_ImageBuf_interppixel(
+                self.ptr,
+                s,
+                t,
+                pixel.as_mut_ptr(),
+                mode.into(),
+            );
+        }
+    }
+
+    /// Sample the image plane at pixel coordinates `(x,y)`, using bicubic
+    /// interpolation between pixels, placing the result in `pixel[]`.
+    ///
+    /// # Panics
+    /// * if `pixel` is not long enough to hold all the channels.
+    ///
+    pub fn interp_pixel_bicubic(
+        &self,
+        x: f32,
+        y: f32,
+        pixel: &mut [f32],
+        mode: WrapMode,
+    ) {
+        if pixel.len() < self.num_channels() as usize {
+            panic!("getpixel called with slice of length {} but requested {} channels", pixel.len(), self.num_channels());
+        }
+
+        unsafe {
+            sys::OIIO_ImageBuf_interppixel_bicubic(
+                self.ptr,
+                x,
+                y,
+                pixel.as_mut_ptr(),
+                mode.into(),
+            );
+        }
+    }
+
+    /// Sample the image plane at NDC coordinates `(s,t)`, using bicubic
+    /// interpolation between pixels, placing the result in `pixel[]`.
+    ///
+    /// In NDC coordinates, `(0, 0)` is the upper-left corner of the display
+    /// window, and `(1, 1)` the lower-right.
+    ///
+    /// # Panics
+    /// * if `pixel` is not long enough to hold all the channels.
+    ///
+    pub fn interp_pixel_bicubic_ndc(
+        &self,
+        s: f32,
+        t: f32,
+        pixel: &mut [f32],
+        mode: WrapMode,
+    ) {
+        if pixel.len() < self.num_channels() as usize {
+            panic!("getpixel called with slice of length {} but requested {} channels", pixel.len(), self.num_channels());
+        }
+
+        unsafe {
+            sys::OIIO_ImageBuf_interppixel_bicubic_NDC(
+                self.ptr,
+                s,
+                t,
+                pixel.as_mut_ptr(),
+                mode.into(),
+            );
+        }
+    }
+
+    /// Set the pixel with coordinates (x,y,z) to have the values in
+    /// `pixel`.  
+    ///
+    /// The number of channels copied, is the minimum of `pixel.len()` and the
+    /// actual number of channels in the image.
+    ///
+    pub fn set_pixel(&mut self, x: i32, y: i32, z: i32, pixel: &[f32]) {
+        unsafe {
+            sys::OIIO_ImageBuf_setpixel_3d(
+                self.ptr,
+                x,
+                y,
+                z,
+                pixel.as_ptr(),
+                pixel.len() as i32,
+            );
+        }
+    }
+
+    /// Retrieve the rectangle of pixels spanning the ROI (including
+    /// channels) at the current subimage and MIP-map level, storing the
+    /// pixel values in `pixels`, laid out by the given strides, and converting to
+    /// the type of the `pixels` slice if necessary.
+    ///
+    /// # Errors
+    /// * [`Error::BufferTooSmall`] - if the calculated buffer size given by `roi`
+    /// and `strides` is larger than `pixels`
+    /// * [`Error::Oiio`] - if any other error occurs
+    ///
+    pub unsafe fn get_pixels<T: Pixel>(
+        &self,
+        roi: Roi,
+        pixels: &mut [T],
+        strides: Strides,
+    ) -> Result<()> {
+        let x_stride = if strides.x_stride == Stride::AUTO {
+            roi.num_channels() as usize * std::mem::size_of::<T>()
+        } else {
+            strides.x_stride.0 as usize
+        };
+
+        let y_stride = if strides.y_stride == Stride::AUTO {
+            roi.width() as usize * x_stride
+        } else {
+            strides.y_stride.0 as usize
+        };
+
+        let z_stride = if strides.z_stride == Stride::AUTO {
+            roi.height() as usize * y_stride
+        } else {
+            strides.z_stride.0 as usize
+        };
+
+        let roi_bytes = z_stride * roi.depth() as usize;
+        let slice_bytes = pixels.len() * std::mem::size_of::<T>();
+        if slice_bytes < roi_bytes {
+            return Err(Error::BufferTooSmall);
+        }
+
+        let mut result = false;
+        sys::OIIO_ImageBuf_get_pixels(
+            self.ptr,
+            &mut result,
+            roi.into(),
+            T::FORMAT.into(),
+            pixels.as_mut_ptr() as *mut c_void,
+            strides.x_stride.0,
+            strides.y_stride.0,
+            strides.z_stride.0,
+        );
+
+        if !result {
+            return Err(Error::Oiio(self.get_error(true)));
+        }
+
+        Ok(())
+    }
+
+    /// Copy the data into the given ROI of the ImageBuf.
+    ///
+    /// The `pixels` slice contains values with layout detailed by the stride
+    /// values (in bytes, with AutoStride indicating "contiguous" layout).
+    ///
+    /// # Errors
+    /// * [`Error::BufferTooSmall`] - if the calculated buffer size given by `roi`
+    /// and `strides` is larger than `pixels`
+    /// * [`Error::Oiio`] - if any other error occurs
+    ///
+    pub unsafe fn set_pixels<T: Pixel>(
+        &mut self,
+        roi: Roi,
+        pixels: &[T],
+        strides: Strides,
+    ) -> Result<()> {
+        let x_stride = if strides.x_stride == Stride::AUTO {
+            roi.num_channels() as usize * std::mem::size_of::<T>()
+        } else {
+            strides.x_stride.0 as usize
+        };
+
+        let y_stride = if strides.y_stride == Stride::AUTO {
+            roi.width() as usize * x_stride
+        } else {
+            strides.y_stride.0 as usize
+        };
+
+        let z_stride = if strides.z_stride == Stride::AUTO {
+            roi.height() as usize * y_stride
+        } else {
+            strides.z_stride.0 as usize
+        };
+
+        let roi_bytes = z_stride * roi.depth() as usize;
+        let slice_bytes = pixels.len() * std::mem::size_of::<T>();
+        if slice_bytes < roi_bytes {
+            return Err(Error::BufferTooSmall);
+        }
+
+        let mut result = false;
+        sys::OIIO_ImageBuf_set_pixels(
+            self.ptr,
+            &mut result,
+            roi.into(),
+            T::FORMAT.into(),
+            pixels.as_ptr() as *const c_void,
+            strides.x_stride.0,
+            strides.y_stride.0,
+            strides.z_stride.0,
+        );
+
+        if !result {
+            return Err(Error::Oiio(self.get_error(true)));
+        }
+
+        Ok(())
+    }
+}
+
+impl ImageBuf {
+    //! Getting and setting information
+
+    /// Has the ImageBuf been initialized yet?
+    ///
+    pub fn initialized(&self) -> bool {
+        let mut result = false;
+        unsafe {
+            sys::OIIO_ImageBuf_initialized(self.ptr, &mut result);
+        }
+        result
+    }
+
+    /// Return the number of color channels in the image. This is equivalent
+    /// to `spec().nchannels()`.
+    ///
+    pub fn num_channels(&self) -> i32 {
+        let mut result = 0;
+        unsafe {
+            sys::OIIO_ImageBuf_nchannels(self.ptr, &mut result);
+        }
+        result
+    }
+
+    /// Returns the type of [`Storage`] being used by this ImageBuf
+    ///
+    pub fn storage(&self) -> Storage {
+        let mut s = sys::OIIO_ImageBuf_IBStorage_UNINITIALIZED;
+        unsafe {
+            sys::OIIO_ImageBuf_storage(self.ptr, &mut s);
+        }
+        s.into()
+    }
+
+    /// Get a reference to the [`ImageSpec`] that defines the buffer
+    ///
+    pub fn spec(&self) -> ImageSpecRef {
+        let mut ptr = std::ptr::null();
+        unsafe {
+            sys::OIIO_ImageBuf_spec(self.ptr, &mut ptr);
+        }
+        ImageSpecRef::new(ptr)
+    }
+
+    /// Get a reference to the "native" [`ImageSpec`] that defines the file this
+    /// ImageBuf refers to.
+    ///
+    /// This may be slightly different from that returned by [`spec()`](ImageBuf::spec),
+    /// particularly if this ImageBuf is backed by an [`ImageCache`] that imposes
+    /// limits on data formats and tile sizes.
+    ///
+    pub fn native_spec(&self) -> ImageSpecRef {
+        let mut ptr = std::ptr::null();
+        unsafe {
+            sys::OIIO_ImageBuf_nativespec(self.ptr, &mut ptr);
+        }
+        ImageSpecRef::new(ptr)
+    }
+
+    /// Returns the name of the buffer (name of the file, for an ImageBuf
+    /// read from disk).
+    pub fn name(&self) -> &str {
+        let mut sv = sys::OIIO_string_view_t::default();
+        unsafe {
+            sys::OIIO_ImageBuf_name(self.ptr, &mut sv);
+
+            let mut ptr = std::ptr::null();
+            let mut len = 0;
+            sys::OIIO_string_view_c_str(&sv, &mut ptr);
+            sys::OIIO_string_view_size(&sv, &mut len);
+            let s = std::slice::from_raw_parts(ptr as *const u8, len as usize);
+            std::str::from_utf8(s).expect("invalid utf-8 in ImageBuf name")
+        }
+    }
+
+    /// Returns the name of the buffer (name of the file, for an ImageBuf
+    /// read from disk).
+    pub fn file_format_name(&self) -> &str {
+        let mut sv = sys::OIIO_string_view_t::default();
+        unsafe {
+            sys::OIIO_ImageBuf_file_format_name(self.ptr, &mut sv);
+
+            let mut ptr = std::ptr::null();
+            let mut len = 0;
+            sys::OIIO_string_view_c_str(&sv, &mut ptr);
+            sys::OIIO_string_view_size(&sv, &mut len);
+            let s = std::slice::from_raw_parts(ptr as *const u8, len as usize);
+            std::str::from_utf8(s).expect("invalid utf-8 in ImageBuf name")
+        }
+    }
+
+    /// Return the index of the subimage within the file that the ImageBuf
+    /// refers to. This will always be 0 for an ImageBuf that was not
+    /// constructed as a direct reference to a file, or if the file
+    /// contained only one image.
+    ///
+    pub fn subimage(&self) -> i32 {
+        let mut result = 0;
+        unsafe {
+            sys::OIIO_ImageBuf_subimage(self.ptr, &mut result);
+        }
+        result
+    }
+
+    /// Return the number of subimages in the file this ImageBuf refers to.
+    /// This will always be 1 for an ImageBuf that was not constructed as a
+    /// direct reference to a file.
+    ///
+    pub fn num_subimages(&self) -> i32 {
+        let mut result = 0;
+        unsafe {
+            sys::OIIO_ImageBuf_nsubimages(self.ptr, &mut result);
+        }
+        result
+    }
+
+    /// Return the index of the miplevel with a file's subimage that the
+    /// ImageBuf is currently holding. This will always be 0 for an ImageBuf
+    /// that was not constructed as a direct reference to a file, or if the
+    /// subimage within that file was not MIP-mapped.
+    ///
+    pub fn miplevel(&self) -> i32 {
+        let mut result = 0;
+        unsafe {
+            sys::OIIO_ImageBuf_miplevel(self.ptr, &mut result);
+        }
+        result
+    }
+
+    /// Return the number of MIP levels of the current subimage within the
+    /// file this ImageBuf refers to. This will always be 1 for an ImageBuf
+    /// that was not constructed as a direct reference to a file, or if this
+    /// subimage within the file was not MIP-mapped.
+    ///
+    pub fn num_miplevels(&self) -> i32 {
+        let mut result = 0;
+        unsafe {
+            sys::OIIO_ImageBuf_nmiplevels(self.ptr, &mut result);
+        }
+        result
+    }
+}
+
+impl ImageBuf {
+    //! Deep data
+
+    /// Does this ImageBuf store deep data? Returns `true` if the ImageBuf
+    /// holds a "deep" image, `false` if the ImageBuf holds an ordinary
+    /// pixel-based image.
+    ///
+    pub fn is_deep(&self) -> bool {
+        let mut result = false;
+        unsafe {
+            sys::OIIO_ImageBuf_deep(self.ptr, &mut result);
+        }
+        result
+    }
+
+    /// Retrieve the number of deep data samples corresponding to pixel
+    /// (x,y,z).  Return 0 if not a deep image, or if the pixel is outside
+    /// of the data window, or if the designated pixel has no deep samples.
+    ///
+    pub fn num_deep_samples(&self, x: i32, y: i32, z: i32) -> i32 {
+        let mut result = 0;
+        unsafe {
+            sys::OIIO_ImageBuf_deep_samples(self.ptr, &mut result, x, y, z);
+        }
+        result
+    }
+
+    // FIXME: finish deep stuff
+}
+
+impl Clone for ImageBuf {
+    fn clone(&self) -> ImageBuf {
+        let mut ptr = std::ptr::null_mut();
+        unsafe {
+            sys::OIIO_ImageBuf_clone(
+                self.ptr,
+                &mut ptr,
+                TypeDesc::UNKNOWN.into(),
+            );
+        }
+
+        ImageBuf { ptr }
+    }
 }
 
 impl Drop for ImageBuf {
     fn drop(&mut self) {
         unsafe {
             sys::OIIO_ImageBuf_dtor(self.ptr);
+        }
+    }
+}
+
+/// Describes what happens when an iterator points to
+/// a value outside the usual data range of an image.
+///
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+pub enum WrapMode {
+    Default,
+    Black,
+    Clamp,
+    Periodic,
+    Mirror,
+}
+
+impl From<WrapMode> for sys::OIIO_ImageBuf_WrapMode {
+    fn from(m: WrapMode) -> Self {
+        match m {
+            WrapMode::Default => sys::OIIO_ImageBuf_WrapMode_WrapDefault,
+            WrapMode::Black => sys::OIIO_ImageBuf_WrapMode_WrapBlack,
+            WrapMode::Clamp => sys::OIIO_ImageBuf_WrapMode_WrapClamp,
+            WrapMode::Periodic => sys::OIIO_ImageBuf_WrapMode_WrapPeriodic,
+            WrapMode::Mirror => sys::OIIO_ImageBuf_WrapMode_WrapMirror,
         }
     }
 }

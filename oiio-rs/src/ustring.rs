@@ -9,9 +9,7 @@ impl UString {
         unsafe {
             let cs = CString::new(s).unwrap();
             let mut u = sys::OIIO_ustring_t::default();
-            unsafe {
-                sys::OIIO_ustring_ctor(&mut u, cs.as_ptr());
-            }
+            sys::OIIO_ustring_ctor(&mut u, cs.as_ptr());
             UString(u)
         }
     }
@@ -28,5 +26,31 @@ impl UString {
                 len as usize,
             ))
         }
+    }
+}
+
+impl PartialEq for UString {
+    fn eq(&self, other: &Self) -> bool {
+        unsafe {
+            // # Safety
+            // This is safe as the opaque internals is a pointer
+            let a = *(&self.0 as *const _ as *const *const i8);
+            let b = *(&other.0 as *const _ as *const *const i8);
+            a == b
+        }
+    }
+}
+
+impl Eq for UString{}
+
+impl Default for UString {
+    fn default() -> Self {
+        UString::new("")
+    }
+}
+
+impl std::fmt::Debug for UString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        write!(f, "{}", self.as_str())
     }
 }

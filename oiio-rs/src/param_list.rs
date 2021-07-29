@@ -2,11 +2,54 @@ use crate::traits::AttributeMetadata;
 use crate::typedesc::TypeDesc;
 use crate::ustring::UString;
 use oiio_sys as sys;
+use std::os::raw::c_void;
 
 #[repr(transparent)]
 pub struct ParamValue(pub(crate) sys::OIIO_ParamValue_t);
 
 impl ParamValue {
+    pub fn new<A: AttributeMetadata>(
+        name: UString,
+        interp: Interp,
+        value: &A,
+    ) -> ParamValue {
+        let mut pv = sys::OIIO_ParamValue_t::default();
+        unsafe {
+            sys::OIIO_ParamValue_with_interp_ustring(
+                &mut pv,
+                &name.0,
+                A::TYPE.into(),
+                1,
+                interp.into(),
+                value.ptr(),
+                true,
+            );
+        }
+
+        ParamValue(pv)
+    }
+
+    pub fn from_slice<A: AttributeMetadata>(
+        name: UString,
+        interp: Interp,
+        value: &[A],
+    ) -> ParamValue {
+        let mut pv = sys::OIIO_ParamValue_t::default();
+        unsafe {
+            sys::OIIO_ParamValue_with_interp_ustring(
+                &mut pv,
+                &name.0,
+                A::TYPE.into(),
+                value.len() as i32,
+                interp.into(),
+                value.as_ptr() as *const c_void,
+                true,
+            );
+        }
+
+        ParamValue(pv)
+    }
+
     pub fn name(&self) -> &'static str {
         let mut ptr = std::ptr::null();
         unsafe {
@@ -26,7 +69,7 @@ impl ParamValue {
         td
     }
 
-    pub fn nvalues(&self) -> i32 {
+    pub fn num_values(&self) -> i32 {
         let mut value = 0;
         unsafe {
             sys::OIIO_ParamValue_nvalues(&self.0, &mut value);
@@ -38,7 +81,7 @@ impl ParamValue {
         if self.param_type() != A::TYPE {
             return None;
         }
-        if self.nvalues() != 1 {
+        if self.num_values() != 1 {
             return None;
         }
 
@@ -59,7 +102,7 @@ impl ParamValue {
             sys::OIIO_ParamValue_data(&self.0, &mut ptr);
             Some(std::slice::from_raw_parts(
                 ptr as *const A,
-                self.nvalues() as usize,
+                self.num_values() as usize,
             ))
         }
     }
@@ -67,7 +110,7 @@ impl ParamValue {
 
 /// Interpolation types
 ///
-#[repr(C)]
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub enum Interp {
     /// Constant for all pieces/faces
     Constant = 0,
@@ -77,4 +120,15 @@ pub enum Interp {
     Linear,
     /// Interpolated like vertices
     Vertex,
+}
+
+impl From<Interp> for sys::OIIO_ParamValue_Interp {
+    fn from(i: Interp) -> Self {
+        match i {
+            Interp::Constant => sys::OIIO_ParamValue_Interp_INTERP_CONSTANT,
+            Interp::PerPiece => sys::OIIO_ParamValue_Interp_INTERP_PERPIECE,
+            Interp::Linear => sys::OIIO_ParamValue_Interp_INTERP_LINEAR,
+            Interp::Vertex => sys::OIIO_ParamValue_Interp_INTERP_VERTEX,
+        }
+    }
 }

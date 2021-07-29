@@ -1,15 +1,18 @@
+#[doc=include_str!("imageio.md")]
 use crate::cppstd::{
     CppString, CppVectorString, CppVectorStringRef, CppVectorTypeDesc,
     CppVectorTypeDescRef,
 };
 use crate::error::Error;
 use crate::filesystem::IOProxy;
+use crate::param_list::ParamValue;
 use crate::refptr::{OpaquePtr, Ref, RefMut};
 use crate::string_view::StringView;
 use crate::traits::{AttributeMetadata, Pixel};
 use crate::typedesc::TypeDesc;
 
 use oiio_sys as sys;
+use std::convert::TryInto;
 use std::ffi::CStr;
 use std::marker::PhantomData;
 use std::os::raw::c_void;
@@ -17,6 +20,7 @@ use std::path::Path;
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
+#[derive(Debug, Default, Clone, PartialEq, PartialOrd)]
 #[repr(transparent)]
 pub struct Stride(pub i64);
 
@@ -45,6 +49,125 @@ pub struct Roi {
     pub zend: i32,
     pub chbegin: i32,
     pub chend: i32,
+}
+
+impl Roi {
+    pub fn width(&self) -> usize {
+        (self.xend - self.xbegin) as usize
+    }
+
+    pub fn height(&self) -> usize {
+        (self.yend - self.ybegin) as usize
+    }
+
+    pub fn depth(&self) -> usize {
+        (self.zend - self.zbegin) as usize
+    }
+
+    pub fn num_channels(&self) -> usize {
+        (self.chend - self.chbegin) as usize
+    }
+
+    pub fn num_pixels(&self) -> usize {
+        if self.is_defined() {
+            self.width() * self.height() * self.depth()
+        } else {
+            0
+        }
+    }
+
+    pub fn is_defined(&self) -> bool {
+        self.xbegin == std::i32::MIN
+    }
+
+    pub fn all() -> Roi {
+        Roi::default()
+    }
+
+    pub fn new(
+        xbegin: usize,
+        xend: usize,
+        ybegin: usize,
+        yend: usize,
+        zbegin: usize,
+        zend: usize,
+        chbegin: usize,
+        chend: usize,
+    ) -> Roi {
+        Roi {
+            xbegin: xbegin.try_into().expect("xbegin out of range for i32"),
+            xend: xend.try_into().expect("xend out of range for i32"),
+            ybegin: ybegin.try_into().expect("ybegin out of range for i32"),
+            yend: yend.try_into().expect("yend out of range for i32"),
+            zbegin: zbegin.try_into().expect("zbegin out of range for i32"),
+            zend: zend.try_into().expect("zend out of range for i32"),
+            chbegin: chbegin.try_into().expect("chbegin out of range for i32"),
+            chend: chend.try_into().expect("chend out of range for i32"),
+        }
+    }
+
+    pub fn new2d(
+        xbegin: usize,
+        xend: usize,
+        ybegin: usize,
+        yend: usize,
+    ) -> Roi {
+        Roi::new(xbegin, xend, ybegin, yend, 0, 1, 0, std::i32::MAX as usize)
+    }
+
+    pub fn contains_pixel(
+        &self,
+        x: usize,
+        y: usize,
+        z: usize,
+        ch: usize,
+    ) -> bool {
+        let x = x.try_into().expect("x out of range for i32");
+        let y = y.try_into().expect("y out of range for i32");
+        let z = z.try_into().expect("z out of range for i32");
+        let ch = ch.try_into().expect("ch out of range for i32");
+        (self.xbegin..self.xend).contains(&x)
+            && (self.ybegin..self.yend).contains(&y)
+            && (self.zbegin..self.zend).contains(&z)
+            && (self.chbegin..self.chend).contains(&ch)
+    }
+
+    pub fn contains_roi(&self, rhs: &Roi) -> bool {
+        (self.xbegin..=self.xend).contains(&rhs.xbegin)
+            && (self.ybegin..=self.yend).contains(&rhs.ybegin)
+            && (self.zbegin..=self.zend).contains(&rhs.zbegin)
+            && (self.chbegin..=self.chend).contains(&rhs.chbegin)
+            && (self.xbegin..=self.xend).contains(&rhs.xend)
+            && (self.ybegin..=self.yend).contains(&rhs.yend)
+            && (self.zbegin..=self.zend).contains(&rhs.zend)
+            && (self.chbegin..=self.chend).contains(&rhs.chend)
+    }
+
+    pub fn union(&self, rhs: &Roi) -> Roi {
+        Roi {
+            xbegin: self.xbegin.min(rhs.xbegin),
+            xend: self.xend.max(rhs.xend),
+            ybegin: self.ybegin.min(rhs.ybegin),
+            yend: self.yend.max(rhs.yend),
+            zbegin: self.zbegin.min(rhs.zbegin),
+            zend: self.zend.max(rhs.zend),
+            chbegin: self.chbegin.min(rhs.chbegin),
+            chend: self.chend.max(rhs.chend),
+        }
+    }
+
+    pub fn intersection(&self, rhs: &Roi) -> Roi {
+        Roi {
+            xbegin: self.xbegin.max(rhs.xbegin),
+            xend: self.xend.min(rhs.xend),
+            ybegin: self.ybegin.max(rhs.ybegin),
+            yend: self.yend.min(rhs.yend),
+            zbegin: self.zbegin.max(rhs.zbegin),
+            zend: self.zend.min(rhs.zend),
+            chbegin: self.chbegin.max(rhs.chbegin),
+            chend: self.chend.min(rhs.chend),
+        }
+    }
 }
 
 impl Default for Roi {
@@ -111,18 +234,18 @@ impl ImageSpec {
     /// channel (if it exists) is assumed to be alpha.
     ///
     pub fn from_dimensions(
-        xres: i32,
-        yres: i32,
-        nchans: i32,
+        xres: usize,
+        yres: usize,
+        nchans: usize,
         format: TypeDesc,
     ) -> Self {
         let mut inner = std::ptr::null_mut();
         unsafe {
             sys::OIIO_ImageSpec_from_dimensions(
                 &mut inner,
-                xres,
-                yres,
-                nchans,
+                xres.try_into().expect("xres out of range"),
+                yres.try_into().expect("yres out of range"),
+                nchans.try_into().expect("nchans out of range"),
                 format.into(),
             );
         }
@@ -203,17 +326,18 @@ impl ImageSpec {
 
     /// Width of the pixel data window
     ///
-    pub fn width(&self) -> i32 {
+    pub fn width(&self) -> usize {
         let mut ptr = std::ptr::null();
         unsafe {
             sys::OIIO_ImageSpec_get_width(self.0, &mut ptr);
-            *ptr
+            *ptr as usize
         }
     }
 
     /// Width of the pixel data window
     ///
     pub fn set_width(&mut self, value: i32) {
+        let value = value.try_into().expect("value out of range for i32");
         unsafe {
             sys::OIIO_ImageSpec_set_width(self.0, &value);
         }
@@ -221,17 +345,18 @@ impl ImageSpec {
 
     /// Height of the pixel data window
     ///
-    pub fn height(&self) -> i32 {
+    pub fn height(&self) -> usize {
         let mut ptr = std::ptr::null();
         unsafe {
             sys::OIIO_ImageSpec_get_height(self.0, &mut ptr);
-            *ptr
+            *ptr as usize
         }
     }
 
     /// Height of the pixel data window
     ///
-    pub fn set_height(&mut self, value: i32) {
+    pub fn set_height(&mut self, value: usize) {
+        let value = value.try_into().expect("value out of range for i32");
         unsafe {
             sys::OIIO_ImageSpec_set_height(self.0, &value);
         }
@@ -239,17 +364,18 @@ impl ImageSpec {
 
     /// Depth of the pixel data window
     ///
-    pub fn depth(&self) -> i32 {
+    pub fn depth(&self) -> usize {
         let mut ptr = std::ptr::null();
         unsafe {
             sys::OIIO_ImageSpec_get_depth(self.0, &mut ptr);
-            *ptr
+            *ptr as usize
         }
     }
 
     /// Depth of the pixel data window
     ///
-    pub fn set_depth(&mut self, value: i32) {
+    pub fn set_depth(&mut self, value: usize) {
+        let value = value.try_into().expect("value out of range for i32");
         unsafe {
             sys::OIIO_ImageSpec_set_depth(self.0, &value);
         }
@@ -311,17 +437,18 @@ impl ImageSpec {
 
     /// Width of the display window
     ///
-    pub fn full_width(&self) -> i32 {
+    pub fn full_width(&self) -> usize {
         let mut ptr = std::ptr::null();
         unsafe {
             sys::OIIO_ImageSpec_get_full_width(self.0, &mut ptr);
-            *ptr
+            *ptr as usize
         }
     }
 
     /// Width of the display window
     ///
-    pub fn set_full_width(&mut self, value: i32) {
+    pub fn set_full_width(&mut self, value: usize) {
+        let value = value.try_into().expect("value out of range for i32");
         unsafe {
             sys::OIIO_ImageSpec_set_full_width(self.0, &value);
         }
@@ -329,17 +456,18 @@ impl ImageSpec {
 
     /// Height of the display window
     ///
-    pub fn full_height(&self) -> i32 {
+    pub fn full_height(&self) -> usize {
         let mut ptr = std::ptr::null();
         unsafe {
             sys::OIIO_ImageSpec_get_full_height(self.0, &mut ptr);
-            *ptr
+            *ptr as usize
         }
     }
 
     /// Height of the display window
     ///
-    pub fn set_full_height(&mut self, value: i32) {
+    pub fn set_full_height(&mut self, value: usize) {
+        let value = value.try_into().expect("value out of range for i32");
         unsafe {
             sys::OIIO_ImageSpec_set_full_height(self.0, &value);
         }
@@ -347,17 +475,18 @@ impl ImageSpec {
 
     /// Depth of the display window
     ///
-    pub fn full_depth(&self) -> i32 {
+    pub fn full_depth(&self) -> usize {
         let mut ptr = std::ptr::null();
         unsafe {
             sys::OIIO_ImageSpec_get_full_depth(self.0, &mut ptr);
-            *ptr
+            *ptr as usize
         }
     }
 
     /// Depth of the display window
     ///
-    pub fn set_full_depth(&mut self, value: i32) {
+    pub fn set_full_depth(&mut self, value: usize) {
+        let value = value.try_into().expect("value out of range for i32");
         unsafe {
             sys::OIIO_ImageSpec_set_full_depth(self.0, &value);
         }
@@ -365,17 +494,18 @@ impl ImageSpec {
 
     /// Width of a tile (0 if this is a scanline image)
     ///
-    pub fn tile_width(&self) -> i32 {
+    pub fn tile_width(&self) -> usize {
         let mut ptr = std::ptr::null();
         unsafe {
             sys::OIIO_ImageSpec_get_tile_width(self.0, &mut ptr);
-            *ptr
+            *ptr as usize
         }
     }
 
     /// Width of a tile (0 if this is a scanline image)
     ///
-    pub fn set_tile_width(&mut self, value: i32) {
+    pub fn set_tile_width(&mut self, value: usize) {
+        let value = value.try_into().expect("value out of range for i32");
         unsafe {
             sys::OIIO_ImageSpec_set_tile_width(self.0, &value);
         }
@@ -383,17 +513,18 @@ impl ImageSpec {
 
     /// Height of a tile (0 if this is a scanline image)    
     ///
-    pub fn tile_height(&self) -> i32 {
+    pub fn tile_height(&self) -> usize {
         let mut ptr = std::ptr::null();
         unsafe {
             sys::OIIO_ImageSpec_get_tile_height(self.0, &mut ptr);
-            *ptr
+            *ptr as usize
         }
     }
 
     /// Height of a tile (0 if this is a scanline image)    
     ///
-    pub fn set_tile_height(&mut self, value: i32) {
+    pub fn set_tile_height(&mut self, value: usize) {
+        let value = value.try_into().expect("value out of range for i32");
         unsafe {
             sys::OIIO_ImageSpec_set_tile_height(self.0, &value);
         }
@@ -401,17 +532,18 @@ impl ImageSpec {
 
     /// Depth of a tile (0 if this is a scanline image)    
     ///
-    pub fn tile_depth(&self) -> i32 {
+    pub fn tile_depth(&self) -> usize {
         let mut ptr = std::ptr::null();
         unsafe {
             sys::OIIO_ImageSpec_get_tile_depth(self.0, &mut ptr);
-            *ptr
+            *ptr as usize
         }
     }
 
     /// Depth of a tile (0 if this is a scanline image)    
     ///
-    pub fn set_tile_depth(&mut self, value: i32) {
+    pub fn set_tile_depth(&mut self, value: usize) {
+        let value = value.try_into().expect("value out of range for i32");
         unsafe {
             sys::OIIO_ImageSpec_set_tile_depth(self.0, &value);
         }
@@ -419,17 +551,18 @@ impl ImageSpec {
 
     /// Number of image channels, e.g. 4 for RGBA
     ///
-    pub fn nchannels(&self) -> i32 {
+    pub fn num_channels(&self) -> usize {
         let mut ptr = std::ptr::null();
         unsafe {
             sys::OIIO_ImageSpec_get_nchannels(self.0, &mut ptr);
-            *ptr
+            *ptr as usize
         }
     }
 
     /// Number of image channels, e.g. 4 for RGBA
     ///
-    pub fn set_nchannels(&mut self, value: i32) {
+    pub fn set_num_channels(&mut self, value: usize) {
+        let value = value.try_into().expect("value out of range for i32");
         unsafe {
             sys::OIIO_ImageSpec_set_nchannels(self.0, &value);
         }
@@ -490,7 +623,7 @@ impl ImageSpec {
     /// don't wish to support per-channel formats (usually this will be
     /// the format of the channel that has the most precision).
     ///
-    pub fn channelformats(&self) -> CppVectorTypeDescRef {
+    pub fn channel_formats(&self) -> CppVectorTypeDescRef {
         let mut ptr = std::ptr::null();
         unsafe {
             sys::OIIO_ImageSpec_get_channelformats(self.0, &mut ptr);
@@ -508,7 +641,7 @@ impl ImageSpec {
     /// don't wish to support per-channel formats (usually this will be
     /// the format of the channel that has the most precision).
     ///
-    pub fn set_channelformats(&mut self, value: &[TypeDesc]) {
+    pub fn set_channel_formats(&mut self, value: &[TypeDesc]) {
         unsafe {
             let vec = CppVectorTypeDesc::from_slice(value);
             sys::OIIO_ImageSpec_set_channelformats(self.0, vec.0);
@@ -518,7 +651,7 @@ impl ImageSpec {
     /// The names of each channel, in order. Typically this will be "R",
     /// "G", "B", "A" (alpha), "Z" (depth), or other arbitrary names.
     ///
-    pub fn channelnames(&self) -> CppVectorStringRef {
+    pub fn channel_names(&self) -> CppVectorStringRef {
         let mut ptr = std::ptr::null();
         unsafe {
             sys::OIIO_ImageSpec_get_channelnames(self.0, &mut ptr);
@@ -529,7 +662,7 @@ impl ImageSpec {
     /// The names of each channel, in order. Typically this will be "R",
     /// "G", "B", "A" (alpha), "Z" (depth), or other arbitrary names.
     ///
-    pub fn set_channelnames<S: AsRef<str>>(&mut self, value: &[S]) {
+    pub fn set_channel_names<S: AsRef<str>>(&mut self, value: &[S]) {
         unsafe {
             let vec = CppVectorString::from_slice(value);
             sys::OIIO_ImageSpec_set_channelnames(self.0, vec.0);
@@ -573,7 +706,7 @@ impl ImageSpec {
     /// Returns None is there is no z channel in the image, or if the z
     /// channel could not be determined.
     ///
-    pub fn z_channel(&self) -> Option<i32> {
+    pub fn z_channel(&self) -> Option<usize> {
         let mut ptr = std::ptr::null();
         unsafe {
             sys::OIIO_ImageSpec_get_nchannels(self.0, &mut ptr);
@@ -581,7 +714,7 @@ impl ImageSpec {
             if *ptr == -1 {
                 None
             } else {
-                Some(*ptr)
+                Some(*ptr as usize)
             }
         }
     }
@@ -590,9 +723,13 @@ impl ImageSpec {
     ///
     /// Pass None if there is no z channel in the image
     ///
-    pub fn set_z_channel(&mut self, value: Option<i32>) {
+    pub fn set_z_channel(&mut self, value: Option<usize>) {
         // "None" is represented by -1 on the C++ side
-        let value = if let Some(value) = value { value } else { -1 };
+        let value = if let Some(value) = value {
+            value.try_into().expect("value out of range for i32")
+        } else {
+            -1
+        };
         unsafe {
             sys::OIIO_ImageSpec_set_z_channel(self.0, &value);
         }
@@ -656,8 +793,13 @@ impl ImageSpec {
     /// of the channel in terms of the "native" data format of that
     /// channel as stored in the file.
     ///
-    pub fn channel_bytes_for_channel(&self, index: i32, native: bool) -> usize {
+    pub fn channel_bytes_for_channel(
+        &self,
+        index: usize,
+        native: bool,
+    ) -> usize {
         let mut value = 0;
+        let index = index.try_into().expect("index out of range for i32");
         unsafe {
             sys::OIIO_ImageSpec_channel_bytes_for_channel(
                 self.0, &mut value, index, native,
@@ -689,11 +831,13 @@ impl ImageSpec {
     ///
     pub fn pixel_bytes_for_channels(
         &self,
-        chbegin: i32,
-        chend: i32,
+        chbegin: usize,
+        chend: usize,
         native: bool,
     ) -> usize {
         let mut value = 0;
+        let chbegin = chbegin.try_into().expect("chbegin out of range for i32");
+        let chend = chend.try_into().expect("chend out of range for i32");
         unsafe {
             sys::OIIO_ImageSpec_pixel_bytes_for_channels(
                 self.0, &mut value, chbegin, chend, native,
@@ -707,14 +851,15 @@ impl ImageSpec {
     /// i.e., `pixel_bytes(native) * width` This will return
     /// None in the event of an overflow where it's not representable in an
     /// `ImageSize`.
-    pub fn scanline_bytes(&self, native: bool) -> Option<ImageSize> {
+    ///
+    pub fn scanline_bytes(&self, native: bool) -> Option<usize> {
         let mut value = 0;
         unsafe {
             sys::OIIO_ImageSpec_scanline_bytes(self.0, &mut value, native);
             if value == std::u64::MAX {
                 None
             } else {
-                Some(ImageSize(value))
+                Some(value as usize)
             }
         }
     }
@@ -725,14 +870,14 @@ impl ImageSpec {
     /// This will return None in the event of an overflow where it's not
     /// representable in an `ImageSize`
     ///
-    pub fn tile_pixels(&self) -> Option<ImageSize> {
+    pub fn tile_pixels(&self) -> Option<usize> {
         let mut value = 0;
         unsafe {
             sys::OIIO_ImageSpec_tile_pixels(self.0, &mut value);
             if value == std::u64::MAX {
                 None
             } else {
-                Some(ImageSize(value))
+                Some(value as usize)
             }
         }
     }
@@ -747,14 +892,14 @@ impl ImageSpec {
     /// but if `native` is true, compute the size of a pixel in the "native" data
     /// format of the file (these may differ in the case of per-channel formats).
     ///
-    pub fn tile_bytes(&self, native: bool) -> Option<ImageSize> {
+    pub fn tile_bytes(&self, native: bool) -> Option<usize> {
         let mut value = 0;
         unsafe {
             sys::OIIO_ImageSpec_tile_bytes(self.0, &mut value, native);
             if value == std::u64::MAX {
                 None
             } else {
-                Some(ImageSize(value))
+                Some(value as usize)
             }
         }
     }
@@ -764,14 +909,14 @@ impl ImageSpec {
     /// This will return None in the event of an overflow where it's not
     /// representable in an `ImageSize`
     ///
-    pub fn image_pixels(&self) -> Option<ImageSize> {
+    pub fn image_pixels(&self) -> Option<usize> {
         let mut value = 0;
         unsafe {
             sys::OIIO_ImageSpec_image_pixels(self.0, &mut value);
             if value == std::u64::MAX {
                 None
             } else {
-                Some(ImageSize(value))
+                Some(value as usize)
             }
         }
     }
@@ -785,14 +930,14 @@ impl ImageSpec {
     /// but if `native` is true, compute the size of a pixel in the "native" data
     /// format of the file (these may differ in the case of per-channel formats).
     ///
-    pub fn image_bytes(&self, native: bool) -> Option<ImageSize> {
+    pub fn image_bytes(&self, native: bool) -> Option<usize> {
         let mut value = 0;
         unsafe {
             sys::OIIO_ImageSpec_image_bytes(self.0, &mut value, native);
             if value == std::u64::MAX {
                 None
             } else {
-                Some(ImageSize(value))
+                Some(value as usize)
             }
         }
     }
@@ -819,14 +964,142 @@ impl ImageSpec {
         name: S,
         attribute: &A,
     ) {
+        let sv = StringView::from(name.as_ref());
+
         unsafe {
-            let sv = StringView::from(name.as_ref());
             sys::OIIO_ImageSpec_attribute(
                 self.0,
                 sv.0,
                 A::TYPE.into(),
                 attribute.ptr(),
             );
+        }
+    }
+
+    /// Return the type of the named attribute, or None if it is not found.
+    ///
+    pub fn get_attribute_type(
+        &self,
+        name: &str,
+        case_sensitive: bool,
+    ) -> Option<TypeDesc> {
+        let mut result = TypeDesc::UNKNOWN;
+        unsafe {
+            sys::OIIO_ImageSpec_getattributetype(
+                self.0,
+                &mut result as *mut _ as *mut sys::OIIO_TypeDesc_t,
+                StringView::from(name).into(),
+                case_sensitive,
+            );
+        }
+        if result == TypeDesc::UNKNOWN {
+            None
+        } else {
+            Some(result)
+        }
+    }
+
+    /// If an attribute named `name` exists with type `A`, return it, otherwise
+    /// return None
+    ///
+    pub fn get_attribute<A: AttributeMetadata>(
+        &self,
+        name: &str,
+        case_sensitive: bool,
+    ) -> Option<A> {
+        let mut ok = false;
+        let mut result = A::default();
+        let sv = StringView::from(name.as_ref());
+        unsafe {
+            sys::OIIO_ImageSpec_getattribute(
+                self.0,
+                &mut ok,
+                sv.into(),
+                A::TYPE.into(),
+                result.ptr_mut(),
+                case_sensitive,
+            );
+        }
+
+        if ok {
+            Some(result)
+        } else {
+            None
+        }
+    }
+
+    /// Retrieve the named metadata attribute and return its value as an
+    /// `i32`.
+    ///
+    /// Any integer type will convert to `i32` by truncation or
+    /// expansion, string data will parsed into an `i32` if its contents
+    /// consist of of the text representation of one integer. Floating point
+    /// data will not succeed in converting to an `i32`. If no such metadata
+    /// exists, or are of a type that cannot be converted, the `default`
+    /// will be returned.
+    ///
+    pub fn get_attribute_as_i32_or(&self, name: &str, default: i32) -> i32 {
+        let mut result = default;
+        unsafe {
+            let sv = StringView::from(name.as_ref());
+            sys::OIIO_ImageSpec_get_int_attribute(
+                self.0,
+                &mut result,
+                sv.0,
+                default,
+            );
+        }
+        result
+    }
+
+    /// Retrieve the named metadata attribute and return its value as an
+    /// `f32`.
+    ///
+    /// Any integer type will convert to `f32` by truncation or
+    /// expansion, string data will parsed into an `f32` if its contents
+    /// consist of of the text representation of one integer. Floating point
+    /// data will not succeed in converting to an `f32`. If no such metadata
+    /// exists, or are of a type that cannot be converted, the `default`
+    /// will be returned.
+    ///
+    pub fn get_attribute_as_f32_or(&self, name: &str, default: f32) -> f32 {
+        let mut result = default;
+        unsafe {
+            let sv = StringView::from(name.as_ref());
+            sys::OIIO_ImageSpec_get_float_attribute(
+                self.0,
+                &mut result,
+                sv.0,
+                default,
+            );
+        }
+        result
+    }
+
+    /// Retrieve any metadata attribute, converted to a string.
+    /// If no such metadata exists, the `defaultval` will be returned.
+    ///
+    pub fn get_attribute_as_str(&self, name: &str, default: &str) -> &str {
+        unsafe {
+            let sv = StringView::from(name);
+            let mut sv_result = sys::OIIO_string_view_t::default();
+            let sv_default = StringView::from(default);
+            sys::OIIO_ImageSpec_get_string_attribute(
+                self.0,
+                &mut sv_result,
+                sv.into(),
+                sv_default.0,
+            );
+
+            let mut len = 0;
+            let mut ptr = std::ptr::null();
+            sys::OIIO_string_view_c_str(&sv_result, &mut ptr);
+            sys::OIIO_string_view_length(&sv_result, &mut len);
+
+            std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+                ptr as *const u8,
+                len as usize,
+            ))
         }
     }
 
@@ -867,6 +1140,18 @@ impl ImageSpec {
         casesensitive: bool,
     ) {
         self.erase_attribute_of_type(name, TypeDesc::UNKNOWN, casesensitive);
+    }
+
+    /// For a given parameter `p`, format the value nicely as a string.  If
+    /// `human` is true, use especially human-readable explanations (units,
+    /// or decoding of values) for certain known metadata.
+    ///
+    pub fn metadata_val(p: &ParamValue, human: bool) -> String {
+        let mut s = CppString::new("");
+        unsafe {
+            sys::OIIO_ImageSpec_metadata_val(&mut s.0, &p.0, human);
+        }
+        s.as_str().to_string()
     }
 }
 
@@ -943,8 +1228,7 @@ impl ImageInput {
     /// // Allocate enough storage to hold the full image
     /// let mut pixels = vec![
     ///     0u8;
-    ///     (spec.width() * spec.height() * spec.nchannels())
-    ///         as usize
+    ///     (spec.width() * spec.height() * spec.num_channels())
     /// ];
     ///
     /// // Read the image into the storage
@@ -1106,10 +1390,14 @@ impl ImageInput {
     ///
     pub fn spec_for_subimage(
         &self,
-        subimage: i32,
-        miplevel: i32,
+        subimage: usize,
+        miplevel: usize,
     ) -> Result<ImageSpec> {
         let mut ptr = std::ptr::null_mut();
+        let subimage =
+            subimage.try_into().expect("subimage out of range for i32");
+        let miplevel =
+            miplevel.try_into().expect("miplevel out of range for i32");
         unsafe {
             sys::OIIO_ImageInput_spec_for_subimage(
                 self.ptr, &mut ptr, subimage, miplevel,
@@ -1141,10 +1429,14 @@ impl ImageInput {
     ///
     pub fn spec_dimensions(
         &self,
-        subimage: i32,
-        miplevel: i32,
+        subimage: usize,
+        miplevel: usize,
     ) -> Result<ImageSpec> {
         let mut ptr = std::ptr::null_mut();
+        let subimage =
+            subimage.try_into().expect("subimage out of range for i32");
+        let miplevel =
+            miplevel.try_into().expect("miplevel out of range for i32");
         unsafe {
             sys::OIIO_ImageInput_spec_dimensions(
                 self.ptr, &mut ptr, subimage, miplevel,
@@ -1166,24 +1458,24 @@ impl ImageInput {
     /// The first subimage (or the only subimage, if there is just one)
     /// is number 0.
     ///
-    pub fn current_subimage(&self) -> i32 {
+    pub fn current_subimage(&self) -> usize {
         let mut value = 0;
         unsafe {
             sys::OIIO_ImageInput_current_subimage(self.ptr, &mut value);
         }
-        value
+        value as usize
     }
 
     /// Returns the index of the MIPmap image that is currently being read.
     /// The highest-res MIP level (or the only level, if there is just
     /// one) is number 0.
     ///
-    pub fn current_miplevel(&self) -> i32 {
+    pub fn current_miplevel(&self) -> usize {
         let mut value = 0;
         unsafe {
             sys::OIIO_ImageInput_current_miplevel(self.ptr, &mut value);
         }
-        value
+        value as usize
     }
 
     /// Return the text of all pending error messages issued against this
@@ -1205,12 +1497,12 @@ impl ImageInput {
     /// `attribute("threads")` value should be used (which itself defaults
     /// to using as many threads as cores; see Section `Global Attributes`_).
     ///
-    pub fn threads(&self) -> i32 {
+    pub fn threads(&self) -> usize {
         let mut value = 0;
         unsafe {
             sys::OIIO_ImageInput_threads_const(self.ptr, &mut value);
         }
-        value
+        value as usize
     }
 
     /// Set the threading policy for this ImageInput, controlling the
@@ -1225,7 +1517,8 @@ impl ImageInput {
     /// where the calling application has already spawned multiple worker
     /// threads.
     ///
-    pub fn set_threads(&self, threads: i32) {
+    pub fn set_threads(&self, threads: usize) {
+        let threads = threads.try_into().expect("threads out of range for i32");
         unsafe {
             sys::OIIO_ImageInput_threads(self.ptr, threads);
         }
@@ -1260,7 +1553,7 @@ impl ImageInput {
         let spec = self.spec();
         let chend = read_options
             .chend
-            .clamp(read_options.chbegin + 1, spec.nchannels());
+            .clamp(read_options.chbegin + 1, spec.num_channels());
         let nchannels = chend - read_options.chbegin;
         let num_pixels = spec.width() * spec.height() * nchannels;
 
@@ -1296,7 +1589,7 @@ impl ImageInput {
         let spec = self.spec();
         let chend = read_options
             .chend
-            .clamp(read_options.chbegin + 1, spec.nchannels());
+            .clamp(read_options.chbegin + 1, spec.num_channels());
         let nchannels = chend - read_options.chbegin;
         let num_pixels = spec.width() * spec.height() * nchannels;
 
@@ -1326,10 +1619,10 @@ impl ImageInput {
 
     unsafe fn _read_image_impl(
         &mut self,
-        subimage: i32,
-        miplevel: i32,
-        chbegin: i32,
-        chend: i32,
+        subimage: usize,
+        miplevel: usize,
+        chbegin: usize,
+        chend: usize,
         format: TypeDesc,
         pixels: *mut c_void,
         x_stride: Stride,
@@ -1339,6 +1632,12 @@ impl ImageInput {
         progress_callback_data: *mut c_void,
     ) -> Result<()> {
         let mut result = false;
+        let subimage =
+            subimage.try_into().expect("subimage out of range for i32");
+        let miplevel =
+            miplevel.try_into().expect("miplevel out of range for i32");
+        let chbegin = chbegin.try_into().expect("chbegin out of range for i32");
+        let chend = chend.try_into().expect("chend out of range for i32");
         sys::OIIO_ImageInput_read_image(
             self.ptr,
             &mut result,
@@ -1388,10 +1687,10 @@ where
 }
 
 pub struct ReadOptions {
-    pub subimage: i32,
-    pub miplevel: i32,
-    pub chbegin: i32,
-    pub chend: i32,
+    pub subimage: usize,
+    pub miplevel: usize,
+    pub chbegin: usize,
+    pub chend: usize,
     pub x_stride: Stride,
     pub y_stride: Stride,
     pub z_stride: Stride,
@@ -1403,7 +1702,7 @@ impl Default for ReadOptions {
             subimage: 0,
             miplevel: 0,
             chbegin: 0,
-            chend: std::i32::MAX,
+            chend: std::i32::MAX as usize,
             x_stride: Stride::AUTO,
             y_stride: Stride::AUTO,
             z_stride: Stride::AUTO,
@@ -1457,7 +1756,7 @@ impl ImageOutputState for ImageOutputStateClosed {}
 impl ImageOutputState for ImageOutputStateOpened {}
 
 pub type ImageOutput = ImageOutputBase<ImageOutputStateClosed>;
-pub type ImageOuputOpened = ImageOutputBase<ImageOutputStateOpened>;
+pub type ImageOutputOpened = ImageOutputBase<ImageOutputStateOpened>;
 
 impl<S> ImageOutputBase<S>
 where
@@ -1768,6 +2067,17 @@ where
 }
 
 impl ImageOutputBase<ImageOutputStateOpened> {
+    /// Return a reference to the image format specification of the current
+    /// subimage.  
+    ///
+    pub fn spec(&self) -> ImageSpecRef {
+        let mut ptr = std::ptr::null();
+        unsafe {
+            sys::OIIO_ImageOutput_spec(self.ptr, &mut ptr);
+        }
+        ImageSpecRef::new(ptr)
+    }
+
     /// Write the entire image of `spec.width x spec.height x spec.depth`
     /// pixels, from a buffer with the given strides and in the desired
     /// format.
@@ -1781,7 +2091,7 @@ impl ImageOutputBase<ImageOutputStateOpened> {
     pub fn write_image<T: Pixel>(
         &mut self,
         pixels: &[T],
-        write_options: WriteOptions,
+        strides: Strides,
     ) -> Result<()> {
         let mut result = false;
         // FIXME: do checking on the length of the buffer based on spec and
@@ -1792,14 +2102,64 @@ impl ImageOutputBase<ImageOutputStateOpened> {
                 &mut result,
                 T::FORMAT.into(),
                 pixels.as_ptr() as *const c_void,
-                write_options.x_stride.0,
-                write_options.y_stride.0,
-                write_options.z_stride.0,
+                strides.x_stride.0,
+                strides.y_stride.0,
+                strides.z_stride.0,
                 std::mem::transmute::<
                     *const (),
                     extern "C" fn(*mut std::os::raw::c_void, f32) -> bool,
                 >(std::ptr::null()),
                 std::ptr::null_mut(),
+            );
+        }
+
+        if result {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    /// Write the full scanline that includes pixels `(*,y,z)`.  
+    ///
+    /// For 2D non-volume images, `z` should be 0. The `x_stride` value gives the
+    /// distance between successive pixels (in bytes).  Strides set to
+    /// `Stride::AUTO` imply "contiguous" data.
+    ///
+    /// # Errors
+    /// * [`Error::BufferTooSmall`] - if the `pixels` slice is too small for the
+    /// requested `stride`.
+    /// * [`Error::Oiio`] - if any other error occurs
+    ///
+    /// # Panics
+    /// If `y` or `z` are outside of the range of an i32
+    ///
+    pub fn write_scanline<T: Pixel>(
+        &mut self,
+        y: usize,
+        z: usize,
+        pixels: &[T],
+        x_stride: Stride,
+    ) -> Result<()> {
+        let mut result = false;
+
+        let write_byte_size = self.spec().width() as usize
+            * std::mem::size_of::<T>()
+            * x_stride.0.abs() as usize;
+        let slice_byte_size = pixels.len() * std::mem::size_of::<T>();
+        if slice_byte_size < write_byte_size {
+            return Err(Error::BufferTooSmall);
+        }
+
+        unsafe {
+            sys::OIIO_ImageOutput_write_scanline(
+                self.ptr,
+                &mut result,
+                y.try_into().expect("y out of range"),
+                z.try_into().expect("z out of range"),
+                T::FORMAT.into(),
+                pixels.as_ptr() as *const c_void,
+                x_stride.0,
             );
         }
 
@@ -1833,33 +2193,69 @@ impl From<OpenMode> for sys::OIIO_ImageOutput_OpenMode {
     }
 }
 
-pub struct WriteOptions {
+#[derive(Default, Debug, Clone, PartialEq, PartialOrd)]
+pub struct Strides {
     pub x_stride: Stride,
     pub y_stride: Stride,
     pub z_stride: Stride,
 }
 
-impl Default for WriteOptions {
-    fn default() -> Self {
-        Self {
-            x_stride: Stride::AUTO,
-            y_stride: Stride::AUTO,
-            z_stride: Stride::AUTO,
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use crate as oiio;
-    use oiio::error::Error;
-    use oiio::imageio::{
-        ImageInput, ImageOutput, OpenMode, ReadOptions, WriteOptions,
-    };
+    use oiio::Error;
     use std::path::Path;
 
     #[test]
+    fn test_imagespec_metadata() -> Result<(), Error> {
+        use oiio::prelude::*;
+
+        let mut spec = ImageSpec::from_dimensions(256, 128, 4, TypeDesc::FLOAT);
+
+        spec.set_attribute("attr_i32", &17i32);
+        assert_eq!(spec.get_attribute::<i32>("attr_i32", true), Some(17i32));
+
+        spec.set_attribute("attr_i32[]", &[17i32, 18, 19, 20]);
+        assert_eq!(
+            spec.get_attribute::<[i32; 4]>("attr_i32[]", true),
+            Some([17i32, 18, 19, 20])
+        );
+
+        spec.set_attribute("attr_f32", &42.0f32);
+        assert_eq!(spec.get_attribute::<f32>("attr_f32", true), Some(42.0f32));
+
+        spec.set_attribute("attr_str", &UString::new("foo"));
+        assert_eq!(
+            spec.get_attribute::<UString>("attr_str", true)
+                .unwrap()
+                .as_str(),
+            "foo"
+        );
+
+        spec.set_attribute(
+            "attr_str[]",
+            &[
+                UString::new("foo"),
+                UString::new("bar"),
+                UString::new("baz"),
+            ],
+        );
+        assert_eq!(
+            spec.get_attribute::<[UString; 3]>("attr_str[]", true),
+            Some([
+                UString::new("foo"),
+                UString::new("bar"),
+                UString::new("baz")
+            ]),
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn read_image() -> Result<(), Error> {
+        use oiio::prelude::*;
+
         let path = Path::new(
             &std::env::var("CARGO_MANIFEST_DIR")
                 .expect("CARGO_MANIFEST_DIR not set"),
@@ -1872,11 +2268,11 @@ mod test {
 
         assert_eq!(spec.width(), 1200);
         assert_eq!(spec.height(), 800);
-        assert_eq!(spec.nchannels(), 4);
+        assert_eq!(spec.num_channels(), 4);
 
         let mut pixels = vec![
             0u8;
-            (spec.width() * spec.height() * spec.nchannels())
+            (spec.width() * spec.height() * spec.num_channels())
                 as usize
         ];
 
@@ -1894,6 +2290,8 @@ mod test {
 
     #[test]
     fn write_image() -> Result<(), Error> {
+        use oiio::prelude::*;
+
         let path = Path::new(
             &std::env::var("CARGO_MANIFEST_DIR")
                 .expect("CARGO_MANIFEST_DIR not set"),
@@ -1906,11 +2304,11 @@ mod test {
 
         assert_eq!(spec.width(), 1200);
         assert_eq!(spec.height(), 800);
-        assert_eq!(spec.nchannels(), 4);
+        assert_eq!(spec.num_channels(), 4);
 
         let mut pixels = vec![
             0u8;
-            (spec.width() * spec.height() * spec.nchannels())
+            (spec.width() * spec.height() * spec.num_channels())
                 as usize
         ];
 
@@ -1923,7 +2321,28 @@ mod test {
             None,
             None,
         )?;
-        io.write_image(&pixels, WriteOptions::default())?;
+        io.write_image(&pixels, Strides::default())?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn write_ex1() -> Result<(), Error> {
+        use oiio::prelude::*;
+
+        let width = 640;
+        let height = 480;
+        let num_channels = 3; // RGB
+        let pixels = vec![0u8; width * height * num_channels];
+        let spec = ImageSpec::from_dimensions(
+            width,
+            height,
+            num_channels,
+            TypeDesc::UINT8,
+        );
+        let mut out =
+            ImageOutput::new("foo.jpg", &spec, OpenMode::Create, None, None)?;
+        out.write_image(&pixels, Strides::default())?;
 
         Ok(())
     }

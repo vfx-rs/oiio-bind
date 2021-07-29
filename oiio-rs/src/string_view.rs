@@ -1,8 +1,23 @@
 use oiio_sys as sys;
-use sys::OIIO_string_view_from_char_array;
 
 #[repr(transparent)]
 pub struct StringView(pub(crate) sys::OIIO_string_view_t);
+
+impl StringView {
+    pub fn as_str(&self) -> &str {
+        unsafe {
+            let mut len = 0;
+            let mut ptr = std::ptr::null();
+            sys::OIIO_string_view_c_str(&self.0, &mut ptr);
+            sys::OIIO_string_view_length(&self.0, &mut len);
+
+            std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+                ptr as *const u8,
+                len as usize,
+            ))
+        }
+    }
+}
 
 impl From<&str> for StringView {
     fn from(s: &str) -> StringView {
@@ -17,6 +32,7 @@ impl From<&str> for StringView {
             StringView(sv)
         }
     }
+
 }
 
 impl From<StringView> for sys::OIIO_string_view_t {

@@ -4,7 +4,14 @@ version = "0.1.0"
 authors = ["Anders Langlands <anderslanglands@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[package.metadata.docs.rs]
+# docs.rs uses a nightly compiler, so by instructing it to use our `doc-images` feature we
+# ensure that it will render any images that we may have in inner attribute documentation.
+# and include the markdown docs
+features = ["full-docs"]
+# KateX for math notation
+# rustdoc-args = [ "--html-in-header", "katex-header.html" ]
+
 
 [dependencies]
 oiio-sys = {path="../build/oiio-sys"}
