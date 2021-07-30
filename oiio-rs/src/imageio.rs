@@ -13,7 +13,7 @@ use crate::typedesc::TypeDesc;
 
 use oiio_sys as sys;
 use std::convert::TryInto;
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 use std::os::raw::c_void;
 use std::path::Path;
@@ -1153,6 +1153,282 @@ impl ImageSpec {
         }
         s.as_str().to_string()
     }
+
+    /// Returns, as a String, a serialized version of this ImageSpec.
+    ///
+    pub fn serialize(
+        &self,
+        format: SerialFormat,
+        verbose: SerialVerbose,
+    ) -> String {
+        let mut s = CppString::new("");
+        unsafe {
+            sys::OIIO_ImageSpec_serialize(
+                self.0,
+                &mut s.0,
+                format.into(),
+                verbose.into(),
+            );
+        }
+        s.as_str().to_string()
+    }
+
+    /// Converts the contents of the `ImageSpec` to an XML string.
+    ///
+    pub fn to_xml(&self) -> String {
+        let mut s = CppString::new("");
+        unsafe {
+            sys::OIIO_ImageSpec_to_xml(self.0, &mut s.0);
+        }
+        s.as_str().to_string()
+    }
+
+    /// Populates the fields of the `ImageSpec` based on the XML passed in.
+    ///
+    pub fn from_xml(&mut self, xml: &str) {
+        let cxml = CString::new(xml).expect("could not convert xml to CString");
+        unsafe {
+            sys::OIIO_ImageSpec_from_xml(self.0, cxml.as_ptr());
+        }
+    }
+
+    /// Hunt for the "Compression" and "CompressionQuality" settings in the
+    /// spec and turn them into the compression name and quality. This
+    /// handles compression name/qual combos of the form "name:quality".
+    ///
+    pub fn decode_compression_metadata(
+        &self,
+        default_compression: Option<&str>,
+        default_quality: Option<i32>,
+    ) -> (&str, i32) {
+        let dc = if let Some(dc) = default_compression {
+            StringView::from(dc)
+        } else {
+            StringView::from("")
+        };
+
+        let dq = if let Some(dq) = default_quality {
+            dq
+        } else {
+            -1
+        };
+
+        let mut p = std::ptr::null_mut();
+        unsafe {
+            sys::OIIO_ImageSpec_decode_compression_metadata(
+                self.0, &mut p, dc.0, dq,
+            );
+
+            let mut sv_ptr = std::ptr::null();
+            let mut i_ptr = std::ptr::null();
+            sys::std_pair_string_int_get_first(p, &mut sv_ptr);
+            sys::std_pair_string_int_get_second(p, &mut i_ptr);
+
+            let mut char_ptr = std::ptr::null();
+            let mut len = 0;
+            sys::OIIO_string_view_c_str(sv_ptr, &mut char_ptr);
+            sys::OIIO_string_view_length(sv_ptr, &mut len);
+
+            (
+                std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+                    char_ptr as *const u8,
+                    len as usize,
+                )),
+                *i_ptr,
+            )
+        }
+    }
+
+    /// Helper function to verify that the given pixel range exactly covers
+    /// a set of tiles.  Also returns false if the spec indicates that the
+    /// image isn't tiled at all.
+    ///
+    /// # Panics
+    /// * If any of the arguments are not representable in an i32
+    ///
+    pub fn valid_tile_range(
+        &self,
+        xbegin: usize,
+        xend: usize,
+        ybegin: usize,
+        yend: usize,
+        zbegin: usize,
+        zend: usize,
+    ) -> bool {
+        let mut result = false;
+        unsafe {
+            sys::OIIO_ImageSpec_valid_tile_range(
+                self.0,
+                &mut result,
+                xbegin.try_into().expect("xbegin not in range for i32"),
+                xend.try_into().expect("xend not in range for i32"),
+                ybegin.try_into().expect("ybegin not in range for i32"),
+                yend.try_into().expect("yend not in range for i32"),
+                zbegin.try_into().expect("zbegin not in range for i32"),
+                zend.try_into().expect("zend not in range for i32"),
+            );
+        }
+        result
+    }
+
+    /// Return the format of the given channel.
+    ///
+    /// Returns [`format()`](ImageSpec::format) if `chan` is not a valid channel
+    /// index
+    ///
+    /// # Panics
+    /// * If `chan` is not representable in an i32
+    ///
+    pub fn channel_format(&self, chan: usize) -> TypeDesc {
+        let mut td = TypeDesc::UNKNOWN;
+        unsafe {
+            sys::OIIO_ImageSpec_channelformat(
+                self.0,
+                &mut td as *mut _ as *mut sys::OIIO_TypeDesc_t,
+                chan.try_into().expect("chan is outside range for i32"),
+            );
+        }
+        td
+    }
+
+    /// Return the name of the given channel.
+    ///
+    /// Returns an empty string if `chan` is not a valid channel
+    /// index
+    ///
+    /// # Panics
+    /// * If `chan` is not representable in an i32
+    ///
+    pub fn channel_name(&self, chan: usize) -> &str {
+        let mut sv = sys::OIIO_string_view_t::default();
+        unsafe {
+            sys::OIIO_ImageSpec_channel_name(
+                self.0,
+                &mut sv,
+                chan.try_into().expect("chan is outside range for i32"),
+            );
+
+            let mut char_ptr = std::ptr::null();
+            let mut len = 0;
+            sys::OIIO_string_view_c_str(&sv, &mut char_ptr);
+            sys::OIIO_string_view_length(&sv, &mut len);
+
+            std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+                char_ptr as *const u8,
+                len as usize,
+            ))
+        }
+    }
+
+    /// Get the index of `channel_name`, returning None if not found.
+    ///
+    pub fn channel_index(&self, channel_name: &str) -> Option<usize> {
+        let mut index = 0;
+        unsafe {
+            sys::OIIO_ImageSpec_channelindex(
+                self.0,
+                &mut index,
+                StringView::from(channel_name).into(),
+            );
+        }
+        if index < 0 {
+            None
+        } else {
+            Some(index as usize)
+        }
+    }
+
+    /// Return the data window as an Roi
+    ///
+    pub fn roi(&self) -> Roi {
+        let mut r = Roi::default();
+        unsafe {
+            sys::OIIO_ImageSpec_roi(
+                self.0,
+                &mut r as *mut _ as *mut sys::OIIO_ROI_t,
+            );
+        }
+        r
+    }
+
+    /// Return the display window as an Roi
+    ///
+    pub fn roi_full(&self) -> Roi {
+        let mut r = Roi::default();
+        unsafe {
+            sys::OIIO_ImageSpec_roi_full(
+                self.0,
+                &mut r as *mut _ as *mut sys::OIIO_ROI_t,
+            );
+        }
+        r
+    }
+
+    /// Set the data window of this spec.
+    ///
+    /// Note the channel range is ignored and the channels set in the spec are
+    /// not changed
+    ///
+    pub fn set_roi(&mut self, roi: &Roi) {
+        unsafe {
+            sys::OIIO_ImageSpec_set_roi(
+                self.0,
+                roi as *const _ as *const sys::OIIO_ROI_t,
+            );
+        }
+    }
+
+    /// Set the display window of this spec.
+    ///
+    /// Note the channel range is ignored and the channels set in the spec are
+    /// not changed
+    ///
+    pub fn set_roi_full(&mut self, roi: &Roi) {
+        unsafe {
+            sys::OIIO_ImageSpec_set_roi_full(
+                self.0,
+                roi as *const _ as *const sys::OIIO_ROI_t,
+            );
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+pub enum SerialFormat {
+    Text,
+    Xml,
+}
+
+impl From<SerialFormat> for sys::OIIO_ImageSpec_SerialFormat {
+    fn from(s: SerialFormat) -> Self {
+        match s {
+            SerialFormat::Text => sys::OIIO_ImageSpec_SerialFormat_SerialText,
+            SerialFormat::Xml => sys::OIIO_ImageSpec_SerialFormat_SerialXML,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+pub enum SerialVerbose {
+    Brief,
+    Detailed,
+    DetailedHuman,
+}
+
+impl From<SerialVerbose> for sys::OIIO_ImageSpec_SerialVerbose {
+    fn from(s: SerialVerbose) -> Self {
+        match s {
+            SerialVerbose::Brief => {
+                sys::OIIO_ImageSpec_SerialVerbose_SerialBrief
+            }
+            SerialVerbose::Detailed => {
+                sys::OIIO_ImageSpec_SerialVerbose_SerialDetailed
+            }
+            SerialVerbose::DetailedHuman => {
+                sys::OIIO_ImageSpec_SerialVerbose_SerialDetailedHuman
+            }
+        }
+    }
 }
 
 impl Drop for ImageSpec {
@@ -1478,6 +1754,42 @@ impl ImageInput {
         value as usize
     }
 
+    /// Seek to the given subimage and MIP-map level within the open image
+    /// file.  The first subimage of the file has index 0, the highest-
+    /// resolution MIP level has index 0.  The new subimage's vital
+    /// statistics=may be retrieved by [`spec()`](ImageInput::spec).
+    ///
+    /// # Errors
+    /// * [`Error::Oiio`] - if the `subimage` and/or `miplevel` could not be found
+    ///
+    /// # Panics
+    /// * If `subimage` or `miplevel` are not representable as an i32
+    ///
+    pub fn seek_subimage(
+        &self,
+        subimage: usize,
+        miplevel: usize,
+    ) -> Result<()> {
+        let mut result = false;
+        unsafe {
+            sys::OIIO_ImageInput_seek_subimage(
+                self.ptr,
+                &mut result,
+                subimage
+                    .try_into()
+                    .expect("subimage is not representable as i32"),
+                miplevel
+                    .try_into()
+                    .expect("miplevel is not representable as i32"),
+            );
+        }
+        if result {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
     /// Return the text of all pending error messages issued against this
     /// ImageInput by the calling thread, and clear the pending error
     /// message unless `clear` is false. If no error message is pending, it
@@ -1537,14 +1849,6 @@ impl ImageInput {
     /// of the read_* methods that take an explicit subimage/miplevel (but
     /// not against any other ImageInput methods).
     ///
-    /// Because this may be an expensive operation, a progress callback
-    /// may be passed.  Periodically, it will be called as follows:
-    ///
-    /// `progress_callback (progress_callback_data, done)`;
-    ///
-    /// where `done: f32` gives the portion of the image (between 0.0 and 1.0)
-    /// that has been written thus far.
-    ///
     pub fn read_image<T: Pixel>(
         &mut self,
         pixels: &mut [T],
@@ -1580,6 +1884,25 @@ impl ImageInput {
         }
     }
 
+    /// Read the entire image of `spec.width x spec.height x spec.depth`
+    /// pixels into a buffer with the given strides and in the desired
+    /// data format.
+    ///
+    /// Depending on the spec, this will read either all tiles or all
+    /// scanlines. Assume that data points to a layout in row-major order.
+    ///
+    /// This version of read_image, because it passes explicit subimage and
+    /// miplevel, does not require a separate call to seek_subimage, and is
+    /// guaranteed to be thread-safe against other concurrent calls to any
+    /// of the read_* methods that take an explicit subimage/miplevel (but
+    /// not against any other ImageInput methods).
+    ///
+    /// Because this may be an expensive operation, a progress callback
+    /// may be passed as a closure taking a single f32 which specifies the
+    /// proportion of the file read between 0 and 1. Returning `true` from this
+    /// closure will cause the read to be aborted, while `false` will let it
+    /// continue.
+    ///
     pub fn read_image_with_progress<T: Pixel, F: FnMut(f32) -> bool>(
         &mut self,
         pixels: &mut [T],
@@ -1661,6 +1984,369 @@ impl ImageInput {
         }
 
         Ok(())
+    }
+
+    /// Read the scanline that includes pixels `(*,y,z)` from the current
+    /// subimage and MIP level.  
+    ///
+    /// The `x_stride` value gives the distance between successive pixels (in bytes).
+    /// Strides set to `Stride::AUTO` imply "contiguous" data.
+    ///
+    /// @note This variety of `read_scanline` is not re-entrant nor
+    /// thread-safe. If you require concurrent reads to the same open
+    /// ImageInput, you should use `read_scanlines`
+    ///
+    /// # Parameters
+    /// * `y/z` - The y & z coordinates of the scanline. For 2D
+    ///                     images, z should be 0.
+    /// * `format` - A TypeDesc describing the type of `data`.
+    /// * `data` - Pointer to the pixel data buffer.
+    /// * `x_stride` - The distance in bytes between successive pixels in `data`
+    /// (or `Stride::AUTO`).
+    ///
+    /// # Errors
+    /// * [`Error::BufferTooSmall`] - if `pixels` is not big enough to hold the
+    /// requested `x_stride`
+    /// * [`Error::Oiio`] - if any other error occurs
+    ///
+    /// # Panics
+    /// * if `y` or `z` are not representable as an i32.
+    ///
+    pub fn read_scanline<T: Pixel>(
+        &mut self,
+        y: usize,
+        z: usize,
+        pixels: &mut [T],
+        x_stride: Stride,
+    ) -> Result<()> {
+        let mut result = false;
+
+        let xs = if x_stride == Stride::AUTO {
+            std::mem::size_of::<T>() * self.spec().num_channels()
+        } else {
+            x_stride.0 as usize
+        };
+        let scanline_bytes = self.spec().width() * xs;
+        let slice_bytes = pixels.len() * std::mem::size_of::<T>();
+        if slice_bytes < scanline_bytes {
+            return Err(Error::BufferTooSmall);
+        }
+
+        unsafe {
+            sys::OIIO_ImageInput_read_scanline(
+                self.ptr,
+                &mut result,
+                y.try_into().expect("y is not representable as i32"),
+                z.try_into().expect("z is not representable as i32"),
+                T::FORMAT.into(),
+                pixels.as_ptr() as *mut T as *mut c_void,
+                x_stride.0,
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Read multiple scanlines that include pixels `(*,y,z)` for all `ybegin
+    /// <= y < yend` in the specified subimage and mip level, into `pixels`,
+    /// using the strides given and converting to the type of `pixels`.
+    /// Only channels `[chbegin,chend)` will be read/copied.
+    ///
+    /// # Parameters
+    /// *  `subimage` - The subimage to read from (starting with 0).
+    /// *  `miplevel` - The MIP level to read (0 is the highest
+    /// resolution level).
+    /// *  `ybegin`/`yend` - The y range of the scanlines being passed.
+    /// *  `z` - The z coordinate of the scanline.
+    /// *  `chbegin`/`chend` The channel range to read.
+    /// *  `format` - A TypeDesc describing the type of `data`.
+    /// *  `data` - Pointer to the pixel data.
+    /// *  `xstride`/`ystride` - The distance in bytes between successive pixels
+    /// and scanlines (or `AutoStride`).
+    ///
+    /// # Errors
+    /// * [`Error::BufferTooSmall`] - if `pixels` is not big enough to hold the
+    /// requested rectangle
+    /// * [`Error::Oiio`] - if any other error occurs
+    ///
+    /// # Panics
+    /// * if any of the usize parameters are not representable as an i32.
+    ///
+    ///
+    pub fn read_scanlines<T: Pixel>(
+        &self,
+        subimage: usize,
+        miplevel: usize,
+        ybegin: usize,
+        yend: usize,
+        z: usize,
+        chbegin: usize,
+        chend: usize,
+        pixels: &mut [T],
+        x_stride: Stride,
+        y_stride: Stride,
+    ) -> Result<()> {
+        let ch = (chend - chbegin).min(self.spec().num_channels());
+
+        let xs = if x_stride == Stride::AUTO {
+            std::mem::size_of::<T>() * ch
+        } else {
+            x_stride.0 as usize
+        };
+
+        let scanline_bytes = self.spec().width() * xs;
+
+        let ys = if y_stride == Stride::AUTO {
+            scanline_bytes
+        } else {
+            y_stride.0 as usize
+        };
+
+        let rect_bytes = ys * (yend - ybegin);
+        let pixels_bytes = pixels.len() * std::mem::size_of::<T>();
+
+        if pixels_bytes < rect_bytes {
+            return Err(Error::BufferTooSmall);
+        }
+
+        let mut result = false;
+        unsafe {
+            let subimage = subimage
+                .try_into()
+                .expect("subimage is not representable as i32");
+            let miplevel = miplevel
+                .try_into()
+                .expect("miplevel is not representable as i32");
+            let ybegin = ybegin
+                .try_into()
+                .expect("ybegin is not representable as i32");
+            let yend =
+                yend.try_into().expect("yend is not representable as i32");
+            let z = z.try_into().expect("z is not representable as i32");
+            let chbegin = chbegin
+                .try_into()
+                .expect("chbegin is not representable as i32");
+            let chend =
+                chend.try_into().expect("chend is not representable as i32");
+
+            sys::OIIO_ImageInput_read_scanlines(
+                self.ptr,
+                &mut result,
+                subimage,
+                miplevel,
+                ybegin,
+                yend,
+                z,
+                chbegin,
+                chend,
+                T::FORMAT.into(),
+                pixels.as_mut_ptr() as *mut c_void,
+                x_stride.0,
+                y_stride.0,
+            );
+        }
+
+        if result {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    /// Read the tile whose upper-left origin is `(x,y,z)` into `pixels`,
+    /// converting if necessary from the native data format of the file into
+    /// the type of `pixels`. 
+    ///
+    /// The stride values give the data spacing of adjacent pixels, scanlines, 
+    /// and volumetric slices (measured in bytes). 
+    /// Strides set to AutoStride imply 'contiguous' data in the shape of a full tile.
+    ///
+    /// @note This variety of `read_tile` is not re-entrant nor thread-safe.
+    /// If you require concurrent reads to the same open ImageInput, you
+    /// should use [`read_tiles()`](ImageInput::read_tiles).
+    ///
+    /// # Parameters
+    /// *  `x/y/z` - The upper left coordinate of the tile being passed.
+    /// *  `pixels` - Slice of pixels to write into
+    /// *  `xstride/ystride/zstride` The distance in bytes between successive pixels,
+    /// scanlines, and image planes (or `AutoStride` to
+    /// indicate a "contiguous" single tile).
+    ///
+    /// # Errors
+    /// * [`Error::BufferTooSmall`] - if `pixels` is not big enough to hold the
+    /// requested rectangle
+    /// * [`Error::Oiio`] - if any other error occurs, including the image not
+    /// being tiled, or `(x, y, z)` not being the upper-left corner of a tile
+    ///
+    /// # Panics
+    /// * if any of the usize parameters are not representable as an i32.
+    ///
+    pub fn read_tile<T: Pixel>(
+        &mut self,
+        x: usize,
+        y: usize,
+        z: usize,
+        pixels: &mut [T],
+        strides: Strides,
+    ) -> Result<()> {
+        let xs = if strides.x_stride == Stride::AUTO {
+            std::mem::size_of::<T>() * self.spec().num_channels()
+        } else {
+            strides.x_stride.0 as usize
+        };
+
+        let ys = if strides.y_stride == Stride::AUTO {
+            xs * self.spec().tile_width()
+        } else {
+            strides.y_stride.0 as usize
+        };
+
+        let zs = if strides.z_stride == Stride::AUTO {
+            ys * self.spec().tile_height()
+        } else {
+            strides.z_stride.0 as usize
+        };
+
+        let tile_bytes = zs * self.spec().tile_depth();
+        let pixels_bytes = pixels.len() * std::mem::size_of::<T>();
+
+        if pixels_bytes < tile_bytes {
+            return Err(Error::BufferTooSmall);
+        }
+
+        let x = x.try_into().expect("x is not representable as i32");
+        let y = y.try_into().expect("y is not representable as i32");
+        let z = z.try_into().expect("z is not representable as i32");
+
+        let mut result = false;
+        unsafe {
+            sys::OIIO_ImageInput_read_tile(
+                self.ptr,
+                &mut result,
+                x,
+                y,
+                z,
+                T::FORMAT.into(),
+                pixels.as_mut_ptr() as *mut c_void,
+                strides.x_stride.0,
+                strides.y_stride.0,
+                strides.z_stride.0,
+            );
+        }
+
+        if result {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    /// Read the block of multiple tiles that include all pixels in `[xbegin,xend) X [ybegin,yend) X [zbegin,zend)`.
+    ///
+    /// This is analogous to calling `read_tile(x,y,z,...)` for each tile
+    /// in turn (but for some file formats, reading multiple tiles may allow
+    /// it to read more efficiently or in parallel).
+    ///
+    /// The begin/end pairs must correctly delineate tile boundaries, with
+    /// the exception that it may also be the end of the image data if the
+    /// image resolution is not a whole multiple of the tile size. The
+    /// stride values give the data spacing of adjacent pixels, scanlines,
+    /// and volumetric slices (measured in bytes). Strides set to AutoStride
+    /// imply contiguous data in the shape of the [begin,end) region.
+    ///
+    /// * `subimage` -   The subimage to read from (starting with 0).
+    /// * `miplevel` - The MIP level to read (0 is the highest resolution level).
+    /// * `xbegin/xend` - The x range of the pixels covered by the group of tiles being read.
+    /// * `ybegin/yend` - The y range of the pixels covered by the tiles.
+    /// * `zbegin/zend` - The z range of the pixels covered by the tiles (for a 2D image, zbegin=0 and zend=1).
+    /// * `chbegin/chend` - The channel range to read.
+    /// * `pixels` - Slice of pixels to write into.
+    /// * `xstride/ystride/zstride` The distance in bytes between successive pixels, scanlines, and image planes (or `AutoStride`).
+    ///
+    pub fn read_tiles<T: Pixel>(
+        &self,
+        subimage: usize,
+        miplevel: usize,
+        xbegin: usize,
+        xend: usize,
+        ybegin: usize,
+        yend: usize,
+        zbegin: usize,
+        zend: usize,
+        chbegin: usize,
+        chend: usize,
+        pixels: &mut [T],
+        strides: Strides,
+    ) -> Result<()> {
+        let width = (xend - xbegin).min(self.spec().width());
+        let height = (yend - ybegin).min(self.spec().height());
+        let depth = (zend - zbegin).min(self.spec().depth());
+        let chan = (chend - chbegin).min(self.spec().num_channels());
+
+        let xs = if strides.x_stride == Stride::AUTO {
+            std::mem::size_of::<T>() * chan
+        } else {
+            strides.x_stride.0 as usize
+        };
+
+        let ys = if strides.y_stride == Stride::AUTO {
+            xs * width
+        } else {
+            strides.y_stride.0 as usize
+        };
+
+        let zs = if strides.z_stride == Stride::AUTO {
+            ys * height
+        } else {
+            strides.z_stride.0 as usize
+        };
+
+        let tile_bytes = zs * depth;
+        let pixels_bytes = pixels.len() * std::mem::size_of::<T>();
+
+        if pixels_bytes < tile_bytes {
+            return Err(Error::BufferTooSmall);
+        }
+
+        let subimage = subimage.try_into().expect("subimage is not representable as i32");
+        let miplevel = miplevel.try_into().expect("miplevel is not representable as i32");
+        let xbegin = xbegin.try_into().expect("xbegin is not representable as i32");
+        let xend = xend.try_into().expect("xend is not representable as i32");
+        let ybegin = ybegin.try_into().expect("ybegin is not representable as i32");
+        let yend = yend.try_into().expect("yend is not representable as i32");
+        let zbegin = zbegin.try_into().expect("zbegin is not representable as i32");
+        let zend = zend.try_into().expect("zend is not representable as i32");
+        let chbegin = chbegin.try_into().expect("chbegin is not representable as i32");
+        let chend = chend.try_into().expect("chend is not representable as i32");
+
+        let mut result = false;
+        unsafe {
+            sys::OIIO_ImageInput_read_tiles(
+                self.ptr,
+                &mut result,
+                subimage,
+                miplevel,
+                xbegin,
+                xend,
+                ybegin,
+                yend,
+                zbegin,
+                zend,
+                chbegin,
+                chend,
+                T::FORMAT.into(),
+                pixels.as_mut_ptr() as *mut c_void,
+                strides.x_stride.0,
+                strides.y_stride.0,
+                strides.z_stride.0,
+            );
+        }
+
+        if result {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
     }
 }
 
