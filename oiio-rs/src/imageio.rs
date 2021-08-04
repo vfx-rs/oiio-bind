@@ -85,47 +85,35 @@ impl Roi {
     }
 
     pub fn new(
-        xbegin: usize,
-        xend: usize,
-        ybegin: usize,
-        yend: usize,
-        zbegin: usize,
-        zend: usize,
+        xbegin: i32,
+        xend: i32,
+        ybegin: i32,
+        yend: i32,
+        zbegin: i32,
+        zend: i32,
         chbegin: usize,
         chend: usize,
     ) -> Roi {
         Roi {
-            xbegin: xbegin.try_into().expect("xbegin out of range for i32"),
-            xend: xend.try_into().expect("xend out of range for i32"),
-            ybegin: ybegin.try_into().expect("ybegin out of range for i32"),
-            yend: yend.try_into().expect("yend out of range for i32"),
-            zbegin: zbegin.try_into().expect("zbegin out of range for i32"),
-            zend: zend.try_into().expect("zend out of range for i32"),
-            chbegin: chbegin.try_into().expect("chbegin out of range for i32"),
-            chend: chend.try_into().expect("chend out of range for i32"),
+            xbegin,
+            xend,
+            ybegin,
+            yend,
+            zbegin,
+            zend,
+            chbegin: chbegin
+                .try_into()
+                .expect("chbegin not representable as i32"),
+            chend: chend.try_into().expect("chend not representable as i32"),
         }
     }
 
-    pub fn new2d(
-        xbegin: usize,
-        xend: usize,
-        ybegin: usize,
-        yend: usize,
-    ) -> Roi {
+    pub fn new2d(xbegin: i32, xend: i32, ybegin: i32, yend: i32) -> Roi {
         Roi::new(xbegin, xend, ybegin, yend, 0, 1, 0, std::i32::MAX as usize)
     }
 
-    pub fn contains_pixel(
-        &self,
-        x: usize,
-        y: usize,
-        z: usize,
-        ch: usize,
-    ) -> bool {
-        let x = x.try_into().expect("x out of range for i32");
-        let y = y.try_into().expect("y out of range for i32");
-        let z = z.try_into().expect("z out of range for i32");
-        let ch = ch.try_into().expect("ch out of range for i32");
+    pub fn contains_pixel(&self, x: i32, y: i32, z: i32, ch: usize) -> bool {
+        let ch = ch.try_into().expect("ch not representable as i32");
         (self.xbegin..self.xend).contains(&x)
             && (self.ybegin..self.yend).contains(&y)
             && (self.zbegin..self.zend).contains(&z)
@@ -336,7 +324,7 @@ impl ImageSpec {
 
     /// Width of the pixel data window
     ///
-    pub fn set_width(&mut self, value: i32) {
+    pub fn set_width(&mut self, value: usize) {
         let value = value.try_into().expect("value out of range for i32");
         unsafe {
             sys::OIIO_ImageSpec_set_width(self.0, &value);
@@ -675,7 +663,7 @@ impl ImageSpec {
     /// Returns None is there is no alpha channel in the image, or if the alpha
     /// channel could not be determined.
     ///
-    pub fn alpha_channel(&self) -> Option<i32> {
+    pub fn alpha_channel(&self) -> Option<usize> {
         let mut ptr = std::ptr::null();
         unsafe {
             sys::OIIO_ImageSpec_get_nchannels(self.0, &mut ptr);
@@ -683,7 +671,7 @@ impl ImageSpec {
             if *ptr == -1 {
                 None
             } else {
-                Some(*ptr)
+                Some(*ptr as usize)
             }
         }
     }
@@ -693,9 +681,13 @@ impl ImageSpec {
     ///
     /// Pass None if there is no alpha channel in the image
     ///
-    pub fn set_alpha_channel(&mut self, value: Option<i32>) {
+    pub fn set_alpha_channel(&mut self, value: Option<usize>) {
         // "None" is represented by -1 on the C++ side
-        let value = if let Some(value) = value { value } else { -1 };
+        let value = if let Some(value) = value {
+            value.try_into().expect("value not representable as i32")
+        } else {
+            -1
+        };
         unsafe {
             sys::OIIO_ImageSpec_set_alpha_channel(self.0, &value);
         }
@@ -2009,13 +2001,10 @@ impl ImageInput {
     /// requested `x_stride`
     /// * [`Error::Oiio`] - if any other error occurs
     ///
-    /// # Panics
-    /// * if `y` or `z` are not representable as an i32.
-    ///
     pub fn read_scanline<T: Pixel>(
         &mut self,
-        y: usize,
-        z: usize,
+        y: i32,
+        z: i32,
         pixels: &mut [T],
         x_stride: Stride,
     ) -> Result<()> {
@@ -2036,8 +2025,8 @@ impl ImageInput {
             sys::OIIO_ImageInput_read_scanline(
                 self.ptr,
                 &mut result,
-                y.try_into().expect("y is not representable as i32"),
-                z.try_into().expect("z is not representable as i32"),
+                y,
+                z,
                 T::FORMAT.into(),
                 pixels.as_ptr() as *mut T as *mut c_void,
                 x_stride.0,
@@ -2077,9 +2066,9 @@ impl ImageInput {
         &self,
         subimage: usize,
         miplevel: usize,
-        ybegin: usize,
-        yend: usize,
-        z: usize,
+        ybegin: i32,
+        yend: i32,
+        z: i32,
         chbegin: usize,
         chend: usize,
         pixels: &mut [T],
@@ -2102,7 +2091,7 @@ impl ImageInput {
             y_stride.0 as usize
         };
 
-        let rect_bytes = ys * (yend - ybegin);
+        let rect_bytes = ys * (yend - ybegin) as usize;
         let pixels_bytes = pixels.len() * std::mem::size_of::<T>();
 
         if pixels_bytes < rect_bytes {
@@ -2117,12 +2106,6 @@ impl ImageInput {
             let miplevel = miplevel
                 .try_into()
                 .expect("miplevel is not representable as i32");
-            let ybegin = ybegin
-                .try_into()
-                .expect("ybegin is not representable as i32");
-            let yend =
-                yend.try_into().expect("yend is not representable as i32");
-            let z = z.try_into().expect("z is not representable as i32");
             let chbegin = chbegin
                 .try_into()
                 .expect("chbegin is not representable as i32");
@@ -2155,10 +2138,10 @@ impl ImageInput {
 
     /// Read the tile whose upper-left origin is `(x,y,z)` into `pixels`,
     /// converting if necessary from the native data format of the file into
-    /// the type of `pixels`. 
+    /// the type of `pixels`.
     ///
-    /// The stride values give the data spacing of adjacent pixels, scanlines, 
-    /// and volumetric slices (measured in bytes). 
+    /// The stride values give the data spacing of adjacent pixels, scanlines,
+    /// and volumetric slices (measured in bytes).
     /// Strides set to AutoStride imply 'contiguous' data in the shape of a full tile.
     ///
     /// @note This variety of `read_tile` is not re-entrant nor thread-safe.
@@ -2183,9 +2166,9 @@ impl ImageInput {
     ///
     pub fn read_tile<T: Pixel>(
         &mut self,
-        x: usize,
-        y: usize,
-        z: usize,
+        x: i32,
+        y: i32,
+        z: i32,
         pixels: &mut [T],
         strides: Strides,
     ) -> Result<()> {
@@ -2213,10 +2196,6 @@ impl ImageInput {
         if pixels_bytes < tile_bytes {
             return Err(Error::BufferTooSmall);
         }
-
-        let x = x.try_into().expect("x is not representable as i32");
-        let y = y.try_into().expect("y is not representable as i32");
-        let z = z.try_into().expect("z is not representable as i32");
 
         let mut result = false;
         unsafe {
@@ -2254,6 +2233,7 @@ impl ImageInput {
     /// and volumetric slices (measured in bytes). Strides set to AutoStride
     /// imply contiguous data in the shape of the [begin,end) region.
     ///
+    /// # Parameters
     /// * `subimage` -   The subimage to read from (starting with 0).
     /// * `miplevel` - The MIP level to read (0 is the highest resolution level).
     /// * `xbegin/xend` - The x range of the pixels covered by the group of tiles being read.
@@ -2263,24 +2243,33 @@ impl ImageInput {
     /// * `pixels` - Slice of pixels to write into.
     /// * `xstride/ystride/zstride` The distance in bytes between successive pixels, scanlines, and image planes (or `AutoStride`).
     ///
+    /// # Errors
+    /// * [`Error::BufferTooSmall`] - if `pixels` is not big enough to hold the
+    /// requested rectangle
+    /// * [`Error::Oiio`] - if any other error occurs, including the image not
+    /// being tiled, or `(x, y, z)` not being the upper-left corner of a tile
+    ///
+    /// # Panics
+    /// * if any of the usize parameters are not representable as an i32.
+    ///
     pub fn read_tiles<T: Pixel>(
         &self,
         subimage: usize,
         miplevel: usize,
-        xbegin: usize,
-        xend: usize,
-        ybegin: usize,
-        yend: usize,
-        zbegin: usize,
-        zend: usize,
+        xbegin: i32,
+        xend: i32,
+        ybegin: i32,
+        yend: i32,
+        zbegin: i32,
+        zend: i32,
         chbegin: usize,
         chend: usize,
         pixels: &mut [T],
         strides: Strides,
     ) -> Result<()> {
-        let width = (xend - xbegin).min(self.spec().width());
-        let height = (yend - ybegin).min(self.spec().height());
-        let depth = (zend - zbegin).min(self.spec().depth());
+        let width = ((xend - xbegin) as usize).min(self.spec().width());
+        let height = ((yend - ybegin) as usize).min(self.spec().height());
+        let depth = ((zend - zbegin) as usize).min(self.spec().depth());
         let chan = (chend - chbegin).min(self.spec().num_channels());
 
         let xs = if strides.x_stride == Stride::AUTO {
@@ -2308,16 +2297,17 @@ impl ImageInput {
             return Err(Error::BufferTooSmall);
         }
 
-        let subimage = subimage.try_into().expect("subimage is not representable as i32");
-        let miplevel = miplevel.try_into().expect("miplevel is not representable as i32");
-        let xbegin = xbegin.try_into().expect("xbegin is not representable as i32");
-        let xend = xend.try_into().expect("xend is not representable as i32");
-        let ybegin = ybegin.try_into().expect("ybegin is not representable as i32");
-        let yend = yend.try_into().expect("yend is not representable as i32");
-        let zbegin = zbegin.try_into().expect("zbegin is not representable as i32");
-        let zend = zend.try_into().expect("zend is not representable as i32");
-        let chbegin = chbegin.try_into().expect("chbegin is not representable as i32");
-        let chend = chend.try_into().expect("chend is not representable as i32");
+        let subimage = subimage
+            .try_into()
+            .expect("subimage is not representable as i32");
+        let miplevel = miplevel
+            .try_into()
+            .expect("miplevel is not representable as i32");
+        let chbegin = chbegin
+            .try_into()
+            .expect("chbegin is not representable as i32");
+        let chend =
+            chend.try_into().expect("chend is not representable as i32");
 
         let mut result = false;
         unsafe {
@@ -2348,6 +2338,8 @@ impl ImageInput {
             Err(Error::Oiio(self.get_error(true)))
         }
     }
+
+    // TODO: deep stuff...
 }
 
 pub type ProgressCallback = extern "C" fn(*mut c_void, f32) -> bool;
@@ -2817,23 +2809,23 @@ impl ImageOutputBase<ImageOutputStateOpened> {
     /// requested `stride`.
     /// * [`Error::Oiio`] - if any other error occurs
     ///
-    /// # Panics
-    /// If `y` or `z` are outside of the range of an i32
-    ///
     pub fn write_scanline<T: Pixel>(
         &mut self,
-        y: usize,
-        z: usize,
+        y: i32,
+        z: i32,
         pixels: &[T],
         x_stride: Stride,
     ) -> Result<()> {
         let mut result = false;
 
-        let write_byte_size = self.spec().width() as usize
-            * std::mem::size_of::<T>()
-            * x_stride.0.abs() as usize;
-        let slice_byte_size = pixels.len() * std::mem::size_of::<T>();
-        if slice_byte_size < write_byte_size {
+        let xs = if x_stride == Stride::AUTO {
+            std::mem::size_of::<T>() * self.spec().num_channels()
+        } else {
+            x_stride.0 as usize
+        };
+        let scanline_bytes = self.spec().width() * xs;
+        let slice_bytes = pixels.len() * std::mem::size_of::<T>();
+        if slice_bytes < scanline_bytes {
             return Err(Error::BufferTooSmall);
         }
 
@@ -2841,11 +2833,325 @@ impl ImageOutputBase<ImageOutputStateOpened> {
             sys::OIIO_ImageOutput_write_scanline(
                 self.ptr,
                 &mut result,
-                y.try_into().expect("y out of range"),
-                z.try_into().expect("z out of range"),
+                y,
+                z,
                 T::FORMAT.into(),
                 pixels.as_ptr() as *const c_void,
                 x_stride.0,
+            );
+        }
+
+        if result {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    /// Write multiple scanlines that include pixels `(*,y,z)` for all `ybegin
+    /// <= y < yend`, from `pixels`.  
+    ///
+    /// This is analogous to calling `write_scanline(y,z,pixels,xstride)`
+    /// repeatedly for each of the scanlines in turn (the advantage, though, is
+    /// that some image file types may be able to write multiple scanlines more
+    /// efficiently or in parallel, than it could with one scanline at a time).
+    ///
+    /// # Parameters
+    /// * `ybegin/yend` - The y range of the scanlines being passed.
+    /// * `z` - The z coordinate of the scanline.
+    /// * `format` - A TypeDesc describing the type of `data`.
+    /// * `data` - Pointer to the pixel data.
+    /// * `xstride/ystride` - The distance in bytes between successive pixels
+    /// and scanlines (or `AutoStride`).
+    ///
+    /// # Errors
+    /// * [`Error::BufferTooSmall`] - if the `pixels` slice is too small for the
+    /// requested `stride`.
+    /// * [`Error::Oiio`] - if any other error occurs
+    ///
+    pub fn write_scanlines<T: Pixel>(
+        &mut self,
+        ybegin: i32,
+        yend: i32,
+        z: i32,
+        pixels: &[T],
+        x_stride: Stride,
+        y_stride: Stride,
+    ) -> Result<()> {
+        let height = ((yend - ybegin) as usize).min(self.spec().height());
+
+        let xs = if x_stride == Stride::AUTO {
+            std::mem::size_of::<T>() * self.spec().num_channels()
+        } else {
+            x_stride.0 as usize
+        };
+
+        let ys = if y_stride == Stride::AUTO {
+            xs * self.spec().width()
+        } else {
+            y_stride.0 as usize
+        };
+
+        let rect_bytes = ys * height;
+        let slice_bytes = pixels.len() * std::mem::size_of::<T>();
+        if slice_bytes < rect_bytes {
+            return Err(Error::BufferTooSmall);
+        }
+
+        let mut result = false;
+        unsafe {
+            sys::OIIO_ImageOutput_write_scanlines(
+                self.ptr,
+                &mut result,
+                ybegin,
+                yend,
+                z,
+                T::FORMAT.into(),
+                pixels.as_ptr() as *const c_void,
+                x_stride.0,
+                y_stride.0,
+            );
+        }
+
+        if result {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    pub fn write_tile<T: Pixel>(
+        &mut self,
+        x: i32,
+        y: i32,
+        z: i32,
+        pixels: &[T],
+        strides: Strides,
+    ) -> Result<()> {
+        let xs = if strides.x_stride == Stride::AUTO {
+            std::mem::size_of::<T>() * self.spec().num_channels()
+        } else {
+            strides.x_stride.0 as usize
+        };
+
+        let ys = if strides.y_stride == Stride::AUTO {
+            xs * self.spec().tile_width()
+        } else {
+            strides.y_stride.0 as usize
+        };
+
+        let zs = if strides.z_stride == Stride::AUTO {
+            ys * self.spec().tile_height()
+        } else {
+            strides.z_stride.0 as usize
+        };
+
+        let tile_bytes = zs * self.spec().tile_depth();
+        let pixels_bytes = pixels.len() * std::mem::size_of::<T>();
+
+        if pixels_bytes < tile_bytes {
+            return Err(Error::BufferTooSmall);
+        }
+
+        let mut result = false;
+        unsafe {
+            sys::OIIO_ImageOutput_write_tile(
+                self.ptr,
+                &mut result,
+                x,
+                y,
+                z,
+                T::FORMAT.into(),
+                pixels.as_ptr() as *const c_void,
+                strides.x_stride.0,
+                strides.y_stride.0,
+                strides.z_stride.0,
+            );
+        }
+
+        if result {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    /// Write the block of multiple tiles that include all pixels in `[xbegin,xend) X [ybegin,yend) X [zbegin,zend)`.
+    ///
+    /// This is analogous to calling `write_tile(x,y,z,...)` for each tile
+    /// in turn (but for some file formats, passing multiple tiles may allow
+    /// it to write more efficiently or in parallel).
+    ///
+    /// The begin/end pairs must correctly delineate tile boundaries, with
+    /// the exception that it may also be the end of the image data if the
+    /// image resolution is not a whole multiple of the tile size. The
+    /// stride values give the data spacing of adjacent pixels, scanlines,
+    /// and volumetric slices (measured in bytes). Strides set to `Stride::AUTO`
+    /// imply contiguous data in the shape of the [begin,end) region.
+    ///
+    /// # Parameters
+    /// * `xbegin/xend` - The x range of the pixels covered by the group of tiles passed.
+    /// * `ybegin/yend` - The y range of the pixels covered by the tiles.
+    /// * `zbegin/zend` - The z range of the pixels covered by the tiles (for a 2D image, zbegin=0 and zend=1).
+    /// * `format` - A TypeDesc describing the type of `data`.
+    /// * `data` - Pointer to the pixel data.
+    /// * `xstride/ystride/zstride` - The distance in bytes between successive pixels, scanlines, and image planes (or `AutoStride`).
+    ///
+    /// # Errors
+    /// * [`Error::BufferTooSmall`] - if the `pixels` slice is too small for the
+    /// requested `stride`.
+    /// * [`Error::Oiio`] - if any other error occurs
+    ///
+    pub fn write_tiles<T: Pixel>(
+        &mut self,
+        xbegin: i32,
+        xend: i32,
+        ybegin: i32,
+        yend: i32,
+        zbegin: i32,
+        zend: i32,
+        pixels: &[T],
+        strides: Strides,
+    ) -> Result<()> {
+        let width = ((xend - xbegin) as usize).min(self.spec().width());
+        let height = ((yend - ybegin) as usize).min(self.spec().height());
+        let depth = ((zend - zbegin) as usize).min(self.spec().depth());
+
+        let xs = if strides.x_stride == Stride::AUTO {
+            std::mem::size_of::<T>() * self.spec().num_channels()
+        } else {
+            strides.x_stride.0 as usize
+        };
+
+        let ys = if strides.y_stride == Stride::AUTO {
+            xs * width
+        } else {
+            strides.y_stride.0 as usize
+        };
+
+        let zs = if strides.z_stride == Stride::AUTO {
+            ys * height
+        } else {
+            strides.z_stride.0 as usize
+        };
+
+        let tile_bytes = zs * depth;
+        let pixels_bytes = pixels.len() * std::mem::size_of::<T>();
+
+        if pixels_bytes < tile_bytes {
+            return Err(Error::BufferTooSmall);
+        }
+
+        let mut result = false;
+        unsafe {
+            sys::OIIO_ImageOutput_write_tiles(
+                self.ptr,
+                &mut result,
+                xbegin,
+                xend,
+                ybegin,
+                yend,
+                zbegin,
+                zend,
+                T::FORMAT.into(),
+                pixels.as_ptr() as *const c_void,
+                strides.x_stride.0,
+                strides.y_stride.0,
+                strides.z_stride.0,
+            );
+        }
+
+        if result {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    /// Write a rectangle of pixels given by the range `[xbegin,xend) X [ybegin,yend) X [zbegin,zend)`
+    ///
+    /// The stride values give the data spacing of adjacent pixels,
+    /// scanlines, and volumetric slices (measured in bytes). Strides set to
+    /// AutoStride imply contiguous data in the shape of the [begin,end)
+    /// region.
+    ///
+    /// # Parameters
+    /// * `xbegin/xend` - The x range of the pixels being passed.
+    /// * `ybegin/yend` - The y range of the pixels being passed.
+    /// * `zbegin/zend` - The z range of the pixels being passed (for a 2D image, zbegin=0 and zend=1).
+    /// * `pixels` - Slice of pixel data to write
+    /// * `xstride/ystride/zstride` - The distance in bytes between successive pixels, scanlines, and image planes (or `AutoStride`).
+    ///
+    /// # Errors
+    /// * [`Error::BufferTooSmall`] - if the `pixels` slice is too small for the
+    /// requested `stride`.
+    /// * [`Error::Oiio`] - if any other error occurs
+    ///
+    pub fn write_rectangle<T: Pixel>(
+        &mut self,
+        xbegin: i32,
+        xend: i32,
+        ybegin: i32,
+        yend: i32,
+        zbegin: i32,
+        zend: i32,
+        pixels: &[T],
+        strides: Strides,
+    ) -> Result<()> {
+        let xbegin = xbegin.max(self.spec().x());
+        let xend = xend.min(xbegin + self.spec().width() as i32);
+
+        let ybegin = ybegin.max(self.spec().y());
+        let yend = yend.min(ybegin + self.spec().height() as i32);
+
+        let zbegin = zbegin.max(self.spec().z());
+        let zend = zend.min(xbegin + self.spec().depth() as i32);
+
+        let width = xend - xbegin;
+        let height = yend - ybegin;
+        let depth = zend - zbegin;
+
+        let xs = if strides.x_stride == Stride::AUTO {
+            std::mem::size_of::<T>() * self.spec().num_channels()
+        } else {
+            strides.x_stride.0 as usize
+        };
+
+        let ys = if strides.y_stride == Stride::AUTO {
+            xs * width as usize
+        } else {
+            strides.y_stride.0 as usize
+        };
+
+        let zs = if strides.z_stride == Stride::AUTO {
+            ys * height as usize
+        } else {
+            strides.z_stride.0 as usize
+        };
+
+        let tile_bytes = zs * depth as usize;
+        let pixels_bytes = pixels.len() * std::mem::size_of::<T>();
+
+        if pixels_bytes < tile_bytes {
+            return Err(Error::BufferTooSmall);
+        }
+
+        let mut result = false;
+        unsafe {
+            sys::OIIO_ImageOutput_write_rectangle(
+                self.ptr,
+                &mut result,
+                xbegin,
+                xend,
+                ybegin,
+                yend,
+                zbegin,
+                zend,
+                T::FORMAT.into(),
+                pixels.as_ptr() as *const c_void,
+                strides.x_stride.0,
+                strides.y_stride.0,
+                strides.z_stride.0,
             );
         }
 

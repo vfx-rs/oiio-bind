@@ -138,7 +138,7 @@ Individual scanlines may be written using [`write_scanline()`](crate::imageio::I
         // ...
 
         // write generated scanline to output
-        out.write_scanline(y, 0, &scanline, Stride::AUTO)?;
+        out.write_scanline(y as i32, 0, &scanline, Stride::AUTO)?;
     }
 
 

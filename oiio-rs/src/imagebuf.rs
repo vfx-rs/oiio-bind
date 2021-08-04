@@ -15,6 +15,7 @@ use oiio_sys as sys;
 
 use std::os::raw::c_void;
 use std::path::Path;
+use std::convert::TryInto;
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -144,13 +145,16 @@ impl ImageBuf {
     ///
     pub fn open<P: AsRef<Path>>(
         name: P,
-        subimage: i32,
-        miplevel: i32,
+        subimage: usize,
+        miplevel: usize,
         imagecache: Option<&ImageCache>,
         config: Option<&ImageSpec>,
         ioproxy: Option<&IOProxy>,
     ) -> Result<ImageBuf> {
         let mut ptr = std::ptr::null_mut();
+        let subimage = subimage.try_into().expect("subimage is not representable as i32");
+        let miplevel = miplevel.try_into().expect("miplevel is not representable as i32");
+
         unsafe {
             sys::OIIO_ImageBuf_ctor(
                 &mut ptr,
@@ -281,12 +285,15 @@ impl ImageBuf {
     ///
     pub fn read(
         &self,
-        subimage: i32,
-        miplevel: i32,
+        subimage: usize,
+        miplevel: usize,
         force: bool,
         convert: Option<TypeDesc>,
     ) -> Result<()> {
         let mut result = false;
+        let subimage = subimage.try_into().expect("subimage is not representable as i32");
+        let miplevel = miplevel.try_into().expect("miplevel is not representable as i32");
+
         unsafe {
             sys::OIIO_ImageBuf_read(
                 self.ptr,
@@ -336,8 +343,8 @@ impl ImageBuf {
     ///
     pub fn read_image_with_progress<F>(
         &self,
-        subimage: i32,
-        miplevel: i32,
+        subimage: usize,
+        miplevel: usize,
         force: bool,
         convert: Option<TypeDesc>,
         progress_callback: F,
@@ -348,6 +355,9 @@ impl ImageBuf {
         let mut result = false;
         let mut progress_callback = progress_callback;
         let trampoline = get_trampoline(&progress_callback);
+
+        let subimage = subimage.try_into().expect("subimage is not representable as i32");
+        let miplevel = miplevel.try_into().expect("miplevel is not representable as i32");
 
         unsafe {
             sys::OIIO_ImageBuf_read(
@@ -399,14 +409,20 @@ impl ImageBuf {
     ///
     pub fn read_channels(
         &self,
-        subimage: i32,
-        miplevel: i32,
-        chbegin: i32,
-        chend: i32,
+        subimage: usize,
+        miplevel: usize,
+        chbegin: usize,
+        chend: usize,
         force: bool,
         convert: Option<TypeDesc>,
     ) -> Result<()> {
         let mut result = false;
+
+        let subimage = subimage.try_into().expect("subimage is not representable as i32");
+        let miplevel = miplevel.try_into().expect("miplevel is not representable as i32");
+        let chbegin = chbegin.try_into().expect("chbegin is not representable as i32");
+        let chend = chend.try_into().expect("chend is not representable as i32");
+
         unsafe {
             sys::OIIO_ImageBuf_read_channels(
                 self.ptr,
@@ -463,10 +479,10 @@ impl ImageBuf {
     ///
     pub fn read_channels_with_progress<F>(
         &self,
-        subimage: i32,
-        miplevel: i32,
-        chbegin: i32,
-        chend: i32,
+        subimage: usize,
+        miplevel: usize,
+        chbegin: usize,
+        chend: usize,
         force: bool,
         convert: Option<TypeDesc>,
         progress_callback: F,
@@ -477,6 +493,11 @@ impl ImageBuf {
         let mut result = false;
         let mut progress_callback = progress_callback;
         let trampoline = get_trampoline(&progress_callback);
+
+        let subimage = subimage.try_into().expect("subimage is not representable as i32");
+        let miplevel = miplevel.try_into().expect("miplevel is not representable as i32");
+        let chbegin = chbegin.try_into().expect("chbegin is not representable as i32");
+        let chend = chend.try_into().expect("chend is not representable as i32");
 
         unsafe {
             sys::OIIO_ImageBuf_read_channels(
@@ -720,7 +741,11 @@ impl ImageBuf {
     /// tiling, or the tile dimensions requested, a suitable supported
     /// tiling choice will be made automatically.
     ///
-    pub fn set_write_tiles(&mut self, width: i32, height: i32, depth: i32) {
+    pub fn set_write_tiles(&mut self, width: usize, height: usize, depth: usize) {
+        let width = width.try_into().expect("width is not representable as i32");
+        let height = height.try_into().expect("height is not representable as i32");
+        let depth = depth.try_into().expect("depth is not representable as i32");
+
         unsafe {
             sys::OIIO_ImageBuf_set_write_tiles(self.ptr, width, height, depth);
         }
@@ -830,15 +855,15 @@ impl ImageBuf {
         y: i32,
         z: i32,
         pixel: &mut [f32],
-        maxchannels: Option<i32>,
+        maxchannels: Option<usize>,
         mode: WrapMode,
     ) {
         let maxchannels = if let Some(maxchannels) = maxchannels {
-            maxchannels
+            maxchannels as i32
         } else {
             std::i32::MAX
         };
-        let n = self.num_channels().min(maxchannels);
+        let n = (self.num_channels() as i32).min(maxchannels);
         if pixel.len() < n as usize {
             panic!("getpixel called with slice of length {} but requested {} channels", pixel.len(), n);
         }
@@ -1128,12 +1153,12 @@ impl ImageBuf {
     /// Return the number of color channels in the image. This is equivalent
     /// to `spec().nchannels()`.
     ///
-    pub fn num_channels(&self) -> i32 {
+    pub fn num_channels(&self) -> usize {
         let mut result = 0;
         unsafe {
             sys::OIIO_ImageBuf_nchannels(self.ptr, &mut result);
         }
-        result
+        result as usize
     }
 
     /// Returns the type of [`Storage`] being used by this ImageBuf
@@ -1208,24 +1233,24 @@ impl ImageBuf {
     /// constructed as a direct reference to a file, or if the file
     /// contained only one image.
     ///
-    pub fn subimage(&self) -> i32 {
+    pub fn subimage(&self) -> usize {
         let mut result = 0;
         unsafe {
             sys::OIIO_ImageBuf_subimage(self.ptr, &mut result);
         }
-        result
+        result as usize
     }
 
     /// Return the number of subimages in the file this ImageBuf refers to.
     /// This will always be 1 for an ImageBuf that was not constructed as a
     /// direct reference to a file.
     ///
-    pub fn num_subimages(&self) -> i32 {
+    pub fn num_subimages(&self) -> usize {
         let mut result = 0;
         unsafe {
             sys::OIIO_ImageBuf_nsubimages(self.ptr, &mut result);
         }
-        result
+        result as usize
     }
 
     /// Return the index of the miplevel with a file's subimage that the
@@ -1233,12 +1258,12 @@ impl ImageBuf {
     /// that was not constructed as a direct reference to a file, or if the
     /// subimage within that file was not MIP-mapped.
     ///
-    pub fn miplevel(&self) -> i32 {
+    pub fn miplevel(&self) -> usize {
         let mut result = 0;
         unsafe {
             sys::OIIO_ImageBuf_miplevel(self.ptr, &mut result);
         }
-        result
+        result as usize
     }
 
     /// Return the number of MIP levels of the current subimage within the
@@ -1246,12 +1271,12 @@ impl ImageBuf {
     /// that was not constructed as a direct reference to a file, or if this
     /// subimage within the file was not MIP-mapped.
     ///
-    pub fn num_miplevels(&self) -> i32 {
+    pub fn num_miplevels(&self) -> usize {
         let mut result = 0;
         unsafe {
             sys::OIIO_ImageBuf_nmiplevels(self.ptr, &mut result);
         }
-        result
+        result as usize
     }
 }
 
@@ -1274,12 +1299,12 @@ impl ImageBuf {
     /// (x,y,z).  Return 0 if not a deep image, or if the pixel is outside
     /// of the data window, or if the designated pixel has no deep samples.
     ///
-    pub fn num_deep_samples(&self, x: i32, y: i32, z: i32) -> i32 {
+    pub fn num_deep_samples(&self, x: i32, y: i32, z: i32) -> usize {
         let mut result = 0;
         unsafe {
             sys::OIIO_ImageBuf_deep_samples(self.ptr, &mut result, x, y, z);
         }
-        result
+        result as usize
     }
 
     // FIXME: finish deep stuff

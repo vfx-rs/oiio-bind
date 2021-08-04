@@ -1,5 +1,6 @@
 /build
 /oiio-rs/target
 /oiio-rs/Cargo.lock
-*.exr
+**/*.exr
+**/*.jpg
 .gdb_history
