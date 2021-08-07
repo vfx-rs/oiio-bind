@@ -4,6 +4,8 @@ pub enum Error {
     Oiio(String),
     #[error("The provided buffer was too small for the data")]
     BufferTooSmall,
+    #[error("The requested stride does not match the requested channel layout")]
+    BadStride,
     #[error("The attribute was either not found, or had the wrong type")]
     InvalidAttribute,
     #[error("The provided ImageHandle did not refer to a valid image")]
