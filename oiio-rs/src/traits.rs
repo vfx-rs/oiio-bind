@@ -1,10 +1,7 @@
-use crate::string_view::StringView;
 use crate::typedesc::{Aggregate, BaseType, TypeDesc, VecSemantics};
 use crate::ustring::UString;
-use oiio_sys as sys;
 
 use half::f16;
-use std::ffi::CString;
 use std::os::raw::c_void;
 
 pub trait Pixel: Clone {

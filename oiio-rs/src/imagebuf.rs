@@ -4,7 +4,7 @@ use crate::filesystem::IOProxy;
 use crate::imagecache::ImageCache;
 use crate::imageio::{
     get_trampoline, ImageOutputOpened, ImageSpec, ImageSpecRef,
-    ProgressCallback, Roi, Stride, Strides
+    Roi, Stride, Strides
 };
 use crate::typedesc::TypeDesc;
 
@@ -306,9 +306,7 @@ impl ImageBuf {
                 } else {
                     TypeDesc::UNKNOWN.into()
                 },
-                std::mem::transmute::<*const (), ProgressCallback>(
-                    std::ptr::null(),
-                ),
+                None,
                 std::ptr::null_mut(),
             );
             if !result {
@@ -371,7 +369,7 @@ impl ImageBuf {
                 } else {
                     TypeDesc::UNKNOWN.into()
                 },
-                trampoline,
+                Some(trampoline),
                 &mut progress_callback as *mut _ as *mut c_void,
             );
 
@@ -437,9 +435,7 @@ impl ImageBuf {
                 } else {
                     TypeDesc::UNKNOWN.into()
                 },
-                std::mem::transmute::<*const (), ProgressCallback>(
-                    std::ptr::null(),
-                ),
+                None,
                 std::ptr::null_mut(),
             );
             if !result {
@@ -513,7 +509,7 @@ impl ImageBuf {
                 } else {
                     TypeDesc::UNKNOWN.into()
                 },
-                trampoline,
+                Some(trampoline),
                 &mut progress_callback as *mut _ as *mut c_void,
             );
 
@@ -574,9 +570,7 @@ impl ImageBuf {
                     TypeDesc::UNKNOWN.into()
                 },
                 sv_format.0,
-                std::mem::transmute::<*const (), ProgressCallback>(
-                    std::ptr::null(),
-                ),
+                None,
                 std::ptr::null_mut(),
             );
         }
@@ -645,7 +639,7 @@ impl ImageBuf {
                     TypeDesc::UNKNOWN.into()
                 },
                 sv_format.0,
-                trampoline,
+                Some(trampoline),
                 &mut progress_callback as *mut _ as *mut c_void,
             );
         }
@@ -679,9 +673,7 @@ impl ImageBuf {
                 self.ptr,
                 &mut result,
                 io.ptr,
-                std::mem::transmute::<*const (), ProgressCallback>(
-                    std::ptr::null(),
-                ),
+                None,
                 std::ptr::null_mut(),
             );
         }
@@ -1362,7 +1354,7 @@ unsafe impl Send for ImageBuf {}
 unsafe impl Sync for ImageBuf {}
 
 pub struct AppImageBuf<T: Pixel> {
-    imagebuf: ImageBuf,
+    _imagebuf: ImageBuf,
     data: Vec<T>,
 }
 
@@ -1407,7 +1399,7 @@ where
             }
 
             Ok(AppImageBuf::<T> {
-                imagebuf: ImageBuf { ptr },
+                _imagebuf: ImageBuf { ptr },
                 data,
             })
         }
@@ -1436,7 +1428,7 @@ mod tests {
         .join("images")
         .join("ferris.png");
 
-        let ib = ImageBuf::open(path, 0, 0, None, None, None)?;
+        let _ib = ImageBuf::open(path, 0, 0, None, None, None)?;
 
         Ok(())
     }

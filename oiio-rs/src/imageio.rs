@@ -1847,13 +1847,42 @@ impl ImageInput {
         read_options: ReadOptions,
     ) -> Result<()> {
         let spec = self.spec();
+        let width = spec.width();
+        let height = spec.height();
+        let depth = spec.depth();
+        let chan = spec.num_channels();
+        
         let chend = read_options
             .chend
-            .clamp(read_options.chbegin + 1, spec.num_channels());
+            .clamp(read_options.chbegin + 1, chan);
         let nchannels = chend - read_options.chbegin;
-        let num_pixels = spec.width() * spec.height() * nchannels;
 
-        if pixels.len() < num_pixels as usize {
+        let xs = if read_options.x_stride == Stride::AUTO {
+            std::mem::size_of::<T>() * nchannels
+        } else {
+            read_options.x_stride.0 as usize
+        };
+
+        if xs < std::mem::size_of::<T>() * nchannels {
+            return Err(Error::BadStride)
+        }
+
+        let ys = if read_options.y_stride == Stride::AUTO {
+            xs * width
+        } else {
+            read_options.y_stride.0 as usize  
+        };
+
+        let zs = if read_options.z_stride == Stride::AUTO {
+            ys * height
+        } else {
+            read_options.z_stride.0 as usize
+        };
+
+        let read_byte_size = zs * depth;
+        let pixels_byte_size = pixels.len() * std::mem::size_of::<T>();
+
+        if pixels_byte_size < read_byte_size {
             return Err(Error::BufferTooSmall);
         }
 
@@ -1868,9 +1897,7 @@ impl ImageInput {
                 read_options.x_stride,
                 read_options.y_stride,
                 read_options.z_stride,
-                std::mem::transmute::<*const (), ProgressCallback>(
-                    std::ptr::null(),
-                ),
+                None,
                 std::ptr::null_mut(),
             )
         }
@@ -1926,7 +1953,7 @@ impl ImageInput {
                 read_options.x_stride,
                 read_options.y_stride,
                 read_options.z_stride,
-                trampoline,
+                Some(trampoline),
                 &mut progress_callback as *mut _ as *mut c_void,
             )
         }
@@ -1943,7 +1970,7 @@ impl ImageInput {
         x_stride: Stride,
         y_stride: Stride,
         z_stride: Stride,
-        progress_callback: ProgressCallback,
+        progress_callback: Option<ProgressCallback>,
         progress_callback_data: *mut c_void,
     ) -> Result<()> {
         let mut result = false;
@@ -2364,6 +2391,7 @@ where
     progress_tramp::<F>
 }
 
+#[derive(Debug, Clone)]
 pub struct ReadOptions {
     pub subimage: usize,
     pub miplevel: usize,
@@ -2783,10 +2811,7 @@ impl ImageOutputBase<ImageOutputStateOpened> {
                 strides.x_stride.0,
                 strides.y_stride.0,
                 strides.z_stride.0,
-                std::mem::transmute::<
-                    *const (),
-                    extern "C" fn(*mut std::os::raw::c_void, f32) -> bool,
-                >(std::ptr::null()),
+                None,
                 std::ptr::null_mut(),
             );
         }
