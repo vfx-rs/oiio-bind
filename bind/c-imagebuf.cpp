@@ -163,9 +163,9 @@ struct ImageBuf {
     auto setpixel(int i, const float* pixel, int maxchannels) -> void;
 
     auto get_pixels(OIIO::ROI roi, OIIO::TypeDesc format, void* result,
-                    long xstride, long ystride, long zstride) const -> bool;
+                    OIIO::stride_t xstride, OIIO::stride_t ystride, OIIO::stride_t zstride) const -> bool;
     auto set_pixels(OIIO::ROI roi, OIIO::TypeDesc format, const void* data,
-                    long xstride, long ystride, long zstride) -> bool;
+                    OIIO::stride_t xstride, OIIO::stride_t ystride, OIIO::stride_t zstride) -> bool;
 
     auto initialized() const -> bool;
     auto storage() const -> OIIO::ImageBuf::IBStorage;
@@ -227,9 +227,9 @@ struct ImageBuf {
     CPPMM_RENAME(localpixels_const)
     auto localpixels() const -> const void*;
 
-    auto pixel_stride() const -> long;
-    auto scanline_stride() const -> long;
-    auto z_stride() const -> long;
+    auto pixel_stride() const -> OIIO::stride_t;
+    auto scanline_stride() const -> OIIO::stride_t;
+    auto z_stride() const -> OIIO::stride_t;
 
     auto cachedpixels() const -> bool;
     auto imagecache() const -> OIIO::ImageCache*;

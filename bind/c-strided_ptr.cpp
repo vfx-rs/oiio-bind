@@ -10,7 +10,7 @@ namespace OIIO = ::OIIO_NAMESPACE;
 template <class T, int StrideUnits> struct strided_ptr {
     using BoundType = OIIO::strided_ptr<T, StrideUnits>;
 
-    strided_ptr<T, StrideUnits>(T* ptr, long stride);
+    strided_ptr<T, StrideUnits>(T* ptr, ptrdiff_t stride);
     ~strided_ptr();
 
     CPPMM_RENAME(copy)
@@ -25,11 +25,11 @@ template <class T, int StrideUnits> struct strided_ptr {
     CPPMM_IGNORE
     auto operator*() const -> T&;
 
-    auto operator[](long pos) const -> T&;
+    auto operator[](ptrdiff_t pos) const -> T&;
 
     auto data() const -> T*;
 
-    auto stride() const -> long;
+    auto stride() const -> ptrdiff_t;
 
     CPPMM_IGNORE
     auto operator==(const T* p) const -> bool;
@@ -50,16 +50,16 @@ template <class T, int StrideUnits> struct strided_ptr {
     auto operator--(int) -> const OIIO::strided_ptr<T, StrideUnits>;
 
     CPPMM_IGNORE
-    auto operator+(long d) const -> OIIO::strided_ptr<T, StrideUnits>;
+    auto operator+(ptrdiff_t d) const -> OIIO::strided_ptr<T, StrideUnits>;
 
     CPPMM_IGNORE
-    auto operator-(long d) const -> OIIO::strided_ptr<T, StrideUnits>;
+    auto operator-(ptrdiff_t d) const -> OIIO::strided_ptr<T, StrideUnits>;
 
     CPPMM_IGNORE
-    auto operator+=(long d) -> const OIIO::strided_ptr<T, StrideUnits>&;
+    auto operator+=(ptrdiff_t d) -> const OIIO::strided_ptr<T, StrideUnits>&;
 
     CPPMM_IGNORE
-    auto operator-=(long d) -> const OIIO::strided_ptr<T, StrideUnits>&;
+    auto operator-=(ptrdiff_t d) -> const OIIO::strided_ptr<T, StrideUnits>&;
 } CPPMM_OPAQUEBYTES CPPMM_TRIVIALLY_MOVABLE
     CPPMM_TRIVIALLY_COPYABLE; // struct strided_ptr
 

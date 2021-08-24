@@ -26,23 +26,23 @@ struct TypeDesc {
     CPPMM_RENAME(copy)
     TypeDesc(const OIIO::TypeDesc& t);
     auto c_str() const -> const char*;
-    auto numelements() const -> unsigned long;
-    auto basevalues() const -> unsigned long;
+    auto numelements() const -> size_t;
+    auto basevalues() const -> size_t;
     auto is_array() const -> bool;
     auto is_unsized_array() const -> bool;
     auto is_sized_array() const -> bool;
-    auto size() const -> unsigned long;
+    auto size() const -> size_t;
     auto elementtype() const -> OIIO::TypeDesc;
-    auto elementsize() const -> unsigned long;
+    auto elementsize() const -> size_t;
     auto scalartype() const -> OIIO::TypeDesc;
-    auto basesize() const -> unsigned long;
+    auto basesize() const -> size_t;
     auto is_floating_point() const -> bool;
     auto is_signed() const -> bool;
     auto is_unknown() const -> bool;
 
     CPPMM_IGNORE
     operator bool() const;
-    auto fromstring(OIIO::string_view typestring) -> unsigned long;
+    auto fromstring(OIIO::string_view typestring) -> size_t;
     auto operator==(const OIIO::TypeDesc& t) const -> bool;
     auto operator!=(const OIIO::TypeDesc& t) const -> bool;
     auto equivalent(const OIIO::TypeDesc& b) const -> bool;

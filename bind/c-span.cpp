@@ -20,7 +20,7 @@ template <class T, ptrdiff_t Extent = -1> struct span {
     span<T, Extent>(const OIIO::span<T, Extent>& copy);
 
     CPPMM_RENAME(from_ptr)
-    span<T, Extent>(T* data, long size);
+    span<T, Extent>(T* data, OIIO::oiio_span_size_type size);
 
     CPPMM_RENAME(from_begin_end)
     span<T, Extent>(T* b, T* e);
@@ -41,14 +41,14 @@ template <class T, ptrdiff_t Extent = -1> struct span {
 
     auto operator=(const OIIO::span<T, Extent>& copy) -> OIIO::span<T, Extent>&;
 
-    auto size() const -> long;
-    auto size_bytes() const -> long;
+    auto size() const -> OIIO::oiio_span_size_type;
+    auto size_bytes() const -> OIIO::oiio_span_size_type;
     auto empty() const -> bool;
     auto data() const -> T*;
-    auto operator[](long idx) const -> T&;
+    auto operator[](OIIO::oiio_span_size_type idx) const -> T&;
     CPPMM_IGNORE
-    auto operator()(long idx) const -> T&;
-    auto at(long idx) const -> T&;
+    auto operator()(OIIO::oiio_span_size_type idx) const -> T&;
+    auto at(OIIO::oiio_span_size_type idx) const -> T&;
     CPPMM_IGNORE
     auto front() const -> T&;
     CPPMM_IGNORE
@@ -100,7 +100,7 @@ template <class T, class Extent> struct span_strided {
 
     span_strided<T, Extent>();
     span_strided<T, Extent>(const OIIO::span_strided<T, Extent>& copy);
-    span_strided<T, Extent>(T* data, long size, long stride);
+    span_strided<T, Extent>(T* data, OIIO::oiio_span_size_type size, OIIO::oiio_span_size_type stride);
     span_strided<T, Extent>(T& data);
     template <typename N> auto span_strided<T, Extent>(UNKNOWN& data) -> void;
     template <typename Allocator>
@@ -111,11 +111,11 @@ template <class T, class Extent> struct span_strided {
     span_strided<T, Extent>(OIIO::span<T, Extent> av);
     auto operator=(const OIIO::span_strided<T, Extent>& copy)
         -> OIIO::span_strided<T, Extent>&;
-    auto size() const -> long;
-    auto stride() const -> long;
-    auto operator[](long idx) const -> T&;
-    auto operator()(long idx) const -> T&;
-    auto at(long idx) const -> T&;
+    auto size() const -> OIIO::oiio_span_size_type;
+    auto stride() const -> OIIO::oiio_span_size_type;
+    auto operator[](OIIO::oiio_span_size_type idx) const -> T&;
+    auto operator()(OIIO::oiio_span_size_type idx) const -> T&;
+    auto at(OIIO::oiio_span_size_type idx) const -> T&;
     auto front() const -> T&;
     auto back() const -> T&;
     auto data() const -> T*;
@@ -151,27 +151,27 @@ auto operator!=(OIIO::span_strided<T, Extent> l,
 
 OIIO::span<const OIIO::TypeDesc> dummy0;
 extern template OIIO::span<const OIIO::TypeDesc>::span(
-    const OIIO::TypeDesc* data, long size);
+    const OIIO::TypeDesc* data, OIIO::oiio_span_size_type size);
 
 OIIO::span<const float> dummy1;
-extern template OIIO::span<const float>::span(const float* data, long size);
+extern template OIIO::span<const float>::span(const float* data, OIIO::oiio_span_size_type size);
 
 OIIO::span<float> dummy2;
-extern template OIIO::span<float>::span(float* data, long size);
+extern template OIIO::span<float>::span(float* data, OIIO::oiio_span_size_type size);
 
 OIIO::span<const int> dummy3;
-extern template OIIO::span<const int>::span(const int* data, long size);
+extern template OIIO::span<const int>::span(const int* data, OIIO::oiio_span_size_type size);
 
 OIIO::span<const unsigned int> dummy4;
 extern template OIIO::span<const unsigned int>::span(const unsigned int* data,
-                                                     long size);
+                                                     OIIO::oiio_span_size_type size);
 OIIO::span<const char> dummy5;
-extern template OIIO::span<const char>::span(const char* data, long size);
+extern template OIIO::span<const char>::span(const char* data, OIIO::oiio_span_size_type size);
 
 OIIO::span<const unsigned char> dummy6;
 extern template OIIO::span<const unsigned char>::span(const unsigned char* data,
-                                                      long size);
+                                                      OIIO::oiio_span_size_type size);
 
 OIIO::span<const std::string> dummy7;
 extern template OIIO::span<const std::string>::span(const std::string* data,
-                                                    long size);
+                                                    OIIO::oiio_span_size_type size);

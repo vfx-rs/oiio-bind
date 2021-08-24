@@ -109,7 +109,7 @@ struct ImageCache {
     auto get_pixels(OIIO::ustring filename, int subimage, int miplevel,
                     int xbegin, int xend, int ybegin, int yend, int zbegin,
                     int zend, int chbegin, int chend, OIIO::TypeDesc format,
-                    void* result, long xstride, long ystride, long zstride,
+                    void* result, OIIO::stride_t xstride, OIIO::stride_t ystride, OIIO::stride_t zstride,
                     int cache_chbegin, int cache_chend) -> bool;
 
     CPPMM_RENAME(get_pixels_with_channels_and_handle)
@@ -118,7 +118,7 @@ struct ImageCache {
                     int subimage, int miplevel, int xbegin, int xend,
                     int ybegin, int yend, int zbegin, int zend, int chbegin,
                     int chend, OIIO::TypeDesc format, void* result,
-                    long xstride, long ystride, long zstride, int cache_chbegin,
+                    OIIO::stride_t xstride, OIIO::stride_t ystride, OIIO::stride_t zstride, int cache_chbegin,
                     int cache_chend) -> bool;
 
     auto get_pixels(OIIO::ustring filename, int subimage, int miplevel,
@@ -165,7 +165,7 @@ struct ImageCache {
 
     auto add_tile(OIIO::ustring filename, int subimage, int miplevel, int x,
                   int y, int z, int chbegin, int chend, OIIO::TypeDesc format,
-                  const void* buffer, long xstride, long ystride, long zstride,
+                  const void* buffer, OIIO::stride_t xstride, OIIO::stride_t ystride, OIIO::stride_t zstride,
                   bool copy) -> bool;
     virtual bool has_error() const = 0;
     auto geterror(bool clear) const -> std::string;

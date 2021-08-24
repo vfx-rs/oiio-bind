@@ -21,7 +21,7 @@ struct ROI {
     auto height() const -> int;
     auto depth() const -> int;
     auto nchannels() const -> int;
-    auto npixels() const -> unsigned long;
+    auto npixels() const -> OIIO::imagesize_t;
     static auto All() -> OIIO::ROI;
     auto contains(int x, int y, int z, int ch) const -> bool;
     CPPMM_RENAME(contains_roi)
@@ -51,33 +51,33 @@ struct ImageSpec {
     CPPMM_RENAME(set_format_and_clear)
     auto set_format(OIIO::TypeDesc fmt) -> void;
     auto default_channel_names() -> void;
-    auto channel_bytes() const -> unsigned long;
+    auto channel_bytes() const -> size_t;
 
     CPPMM_RENAME(channel_bytes_for_channel)
-    auto channel_bytes(int chan, bool native) const -> unsigned long;
-    auto pixel_bytes(bool native) const -> unsigned long;
+    auto channel_bytes(int chan, bool native) const -> size_t;
+    auto pixel_bytes(bool native) const -> size_t;
 
     CPPMM_RENAME(pixel_bytes_for_channels)
     auto pixel_bytes(int chbegin, int chend, bool native) const
-        -> unsigned long;
-    auto scanline_bytes(bool native) const -> unsigned long;
-    auto tile_pixels() const -> unsigned long;
-    auto tile_bytes(bool native) const -> unsigned long;
-    auto image_pixels() const -> unsigned long;
-    auto image_bytes(bool native) const -> unsigned long;
+        -> size_t;
+    auto scanline_bytes(bool native) const -> OIIO::imagesize_t;
+    auto tile_pixels() const -> OIIO::imagesize_t;
+    auto tile_bytes(bool native) const -> OIIO::imagesize_t;
+    auto image_pixels() const -> OIIO::imagesize_t;
+    auto image_bytes(bool native) const -> OIIO::imagesize_t;
     auto size_t_safe() const -> bool;
 
-    static auto auto_stride(long& xstride, long& ystride, long& zstride,
-                            long channelsize, int nchannels, int width,
+    static auto auto_stride(OIIO::stride_t& xstride, OIIO::stride_t& ystride, OIIO::stride_t& zstride,
+                            OIIO::stride_t channelsize, int nchannels, int width,
                             int height) -> void;
 
     CPPMM_RENAME(auto_stride_with_typedesc)
-    static auto auto_stride(long& xstride, long& ystride, long& zstride,
+    static auto auto_stride(OIIO::stride_t& xstride, OIIO::stride_t& ystride, OIIO::stride_t& zstride,
                             OIIO::TypeDesc format, int nchannels, int width,
                             int height) -> void;
 
     CPPMM_RENAME(auto_stride_xstride)
-    static auto auto_stride(long& xstride, OIIO::TypeDesc format, int nchannels)
+    static auto auto_stride(OIIO::stride_t& xstride, OIIO::TypeDesc format, int nchannels)
         -> void;
 
     auto attribute(OIIO::string_view name, OIIO::TypeDesc type,
@@ -255,61 +255,61 @@ struct ImageInput {
     auto seek_subimage(int subimage, OIIO::ImageSpec& newspec) -> bool;
 
     auto read_scanline(int y, int z, OIIO::TypeDesc format, void* data,
-                       long xstride) -> bool;
+                       OIIO::stride_t xstride) -> bool;
 
     CPPMM_RENAME(read_scanline_contiguous)
     auto read_scanline(int y, int z, float* data) -> bool;
 
     auto read_scanlines(int subimage, int miplevel, int ybegin, int yend, int z,
                         int chbegin, int chend, OIIO::TypeDesc format,
-                        void* data, long xstride, long ystride) -> bool;
+                        void* data, OIIO::stride_t xstride, OIIO::stride_t ystride) -> bool;
 
     CPPMM_IGNORE
     auto read_scanlines(int ybegin, int yend, int z, OIIO::TypeDesc format,
-                        void* data, long xstride, long ystride) -> bool;
+                        void* data, OIIO::stride_t xstride, OIIO::stride_t ystride) -> bool;
 
     CPPMM_IGNORE
     auto read_scanlines(int ybegin, int yend, int z, int chbegin, int chend,
-                        OIIO::TypeDesc format, void* data, long xstride,
-                        long ystride) -> bool;
+                        OIIO::TypeDesc format, void* data, OIIO::stride_t xstride,
+                        OIIO::stride_t ystride) -> bool;
 
     auto read_tile(int x, int y, int z, OIIO::TypeDesc format, void* data,
-                   long xstride, long ystride, long zstride) -> bool;
+                   OIIO::stride_t xstride, OIIO::stride_t ystride, OIIO::stride_t zstride) -> bool;
 
     CPPMM_RENAME(read_tile_contiguous)
     auto read_tile(int x, int y, int z, float* data) -> bool;
 
     auto read_tiles(int subimage, int miplevel, int xbegin, int xend,
                     int ybegin, int yend, int zbegin, int zend, int chbegin,
-                    int chend, OIIO::TypeDesc format, void* data, long xstride,
-                    long ystride, long zstride) -> bool;
+                    int chend, OIIO::TypeDesc format, void* data, OIIO::stride_t xstride,
+                    OIIO::stride_t ystride, OIIO::stride_t zstride) -> bool;
 
     CPPMM_IGNORE
     auto read_tiles(int xbegin, int xend, int ybegin, int yend, int zbegin,
-                    int zend, OIIO::TypeDesc format, void* data, long xstride,
-                    long ystride, long zstride) -> bool;
+                    int zend, OIIO::TypeDesc format, void* data, OIIO::stride_t xstride,
+                    OIIO::stride_t ystride, OIIO::stride_t zstride) -> bool;
 
     CPPMM_IGNORE
     auto read_tiles(int xbegin, int xend, int ybegin, int yend, int zbegin,
                     int zend, int chbegin, int chend, OIIO::TypeDesc format,
-                    void* data, long xstride, long ystride, long zstride)
+                    void* data, OIIO::stride_t xstride, OIIO::stride_t ystride, OIIO::stride_t zstride)
         -> bool;
 
     auto read_image(int subimage, int miplevel, int chbegin, int chend,
-                    OIIO::TypeDesc format, void* data, long xstride,
-                    long ystride, long zstride,
+                    OIIO::TypeDesc format, void* data, OIIO::stride_t xstride,
+                    OIIO::stride_t ystride, OIIO::stride_t zstride,
                     OIIO::ProgressCallback progress_callback,
                     void* progress_callback_data) -> bool;
 
     CPPMM_IGNORE
-    auto read_image(OIIO::TypeDesc format, void* data, long xstride,
-                    long ystride, long zstride,
+    auto read_image(OIIO::TypeDesc format, void* data, OIIO::stride_t xstride,
+                    OIIO::stride_t ystride, OIIO::stride_t zstride,
                     OIIO::ProgressCallback progress_callback,
                     void* progress_callback_data) -> bool;
 
     CPPMM_IGNORE
     auto read_image(int chbegin, int chend, OIIO::TypeDesc format, void* data,
-                    long xstride, long ystride, long zstride,
+                    OIIO::stride_t xstride, OIIO::stride_t ystride, OIIO::stride_t zstride,
                     OIIO::ProgressCallback progress_callback,
                     void* progress_callback_data) -> bool;
 
@@ -386,7 +386,7 @@ struct ImageInput {
     auto try_lock() const -> bool;
     auto unlock() const -> void;
 
-    static void* operator new(unsigned long size) CPPMM_IGNORE;
+    static void* operator new(size_t size) CPPMM_IGNORE;
     static void operator delete(void*)CPPMM_IGNORE;
 
 } CPPMM_OPAQUEPTR; // struct ImageInput
@@ -421,20 +421,20 @@ struct ImageOutput {
     auto spec() const -> const OIIO::ImageSpec&;
     auto close() -> bool;
     auto write_scanline(int y, int z, OIIO::TypeDesc format, const void* data,
-                        long xstride) -> bool;
+                        OIIO::stride_t xstride) -> bool;
     auto write_scanlines(int ybegin, int yend, int z, OIIO::TypeDesc format,
-                         const void* data, long xstride, long ystride) -> bool;
+                         const void* data, OIIO::stride_t xstride, OIIO::stride_t ystride) -> bool;
     auto write_tile(int x, int y, int z, OIIO::TypeDesc format,
-                    const void* data, long xstride, long ystride, long zstride)
+                    const void* data, OIIO::stride_t xstride, OIIO::stride_t ystride, OIIO::stride_t zstride)
         -> bool;
     auto write_tiles(int xbegin, int xend, int ybegin, int yend, int zbegin,
                      int zend, OIIO::TypeDesc format, const void* data,
-                     long xstride, long ystride, long zstride) -> bool;
+                     OIIO::stride_t xstride, OIIO::stride_t ystride, OIIO::stride_t zstride) -> bool;
     auto write_rectangle(int xbegin, int xend, int ybegin, int yend, int zbegin,
                          int zend, OIIO::TypeDesc format, const void* data,
-                         long xstride, long ystride, long zstride) -> bool;
-    auto write_image(OIIO::TypeDesc format, const void* data, long xstride,
-                     long ystride, long zstride,
+                         OIIO::stride_t xstride, OIIO::stride_t ystride, OIIO::stride_t zstride) -> bool;
+    auto write_image(OIIO::TypeDesc format, const void* data, OIIO::stride_t xstride,
+                     OIIO::stride_t ystride, OIIO::stride_t zstride,
                      OIIO::ProgressCallback progress_callback,
                      void* progress_callback_data) -> bool;
     auto write_deep_scanlines(int ybegin, int yend, int z,
@@ -467,7 +467,7 @@ struct ImageOutput {
         AppendMIPLevel = 2,
     };
 
-    static void* operator new(unsigned long size) CPPMM_IGNORE;
+    static void* operator new(size_t size) CPPMM_IGNORE;
     static void operator delete(void*)CPPMM_IGNORE;
 
 } CPPMM_OPAQUEPTR; // struct ImageOutput
@@ -525,49 +525,49 @@ auto convert_types(OIIO::TypeDesc src_type, const void* src,
                    OIIO::TypeDesc dst_type, void* dst, int n) -> bool;
 
 auto convert_image(int nchannels, int width, int height, int depth,
-                   const void* src, OIIO::TypeDesc src_type, long src_xstride,
-                   long src_ystride, long src_zstride, void* dst,
-                   OIIO::TypeDesc dst_type, long dst_xstride, long dst_ystride,
-                   long dst_zstride) -> bool;
+                   const void* src, OIIO::TypeDesc src_type, OIIO::stride_t src_xstride,
+                   OIIO::stride_t src_ystride, OIIO::stride_t src_zstride, void* dst,
+                   OIIO::TypeDesc dst_type, OIIO::stride_t dst_xstride, OIIO::stride_t dst_ystride,
+                   OIIO::stride_t dst_zstride) -> bool;
 
 CPPMM_IGNORE
 auto convert_image(int nchannels, int width, int height, int depth,
-                   const void* src, OIIO::TypeDesc src_type, long src_xstride,
-                   long src_ystride, long src_zstride, void* dst,
-                   OIIO::TypeDesc dst_type, long dst_xstride, long dst_ystride,
-                   long dst_zstride, int p1, int p2) -> bool;
+                   const void* src, OIIO::TypeDesc src_type, OIIO::stride_t src_xstride,
+                   OIIO::stride_t src_ystride, OIIO::stride_t src_zstride, void* dst,
+                   OIIO::TypeDesc dst_type, OIIO::stride_t dst_xstride, OIIO::stride_t dst_ystride,
+                   OIIO::stride_t dst_zstride, int p1, int p2) -> bool;
 
 auto parallel_convert_image(int nchannels, int width, int height, int depth,
                             const void* src, OIIO::TypeDesc src_type,
-                            long src_xstride, long src_ystride,
-                            long src_zstride, void* dst,
-                            OIIO::TypeDesc dst_type, long dst_xstride,
-                            long dst_ystride, long dst_zstride, int nthreads)
+                            OIIO::stride_t src_xstride, OIIO::stride_t src_ystride,
+                            OIIO::stride_t src_zstride, void* dst,
+                            OIIO::TypeDesc dst_type, OIIO::stride_t dst_xstride,
+                            OIIO::stride_t dst_ystride, OIIO::stride_t dst_zstride, int nthreads)
     -> bool;
 
 CPPMM_IGNORE
 auto parallel_convert_image(int nchannels, int width, int height, int depth,
                             const void* src, OIIO::TypeDesc src_type,
-                            long src_xstride, long src_ystride,
-                            long src_zstride, void* dst,
-                            OIIO::TypeDesc dst_type, long dst_xstride,
-                            long dst_ystride, long dst_zstride, int p1, int p2,
+                            OIIO::stride_t src_xstride, OIIO::stride_t src_ystride,
+                            OIIO::stride_t src_zstride, void* dst,
+                            OIIO::TypeDesc dst_type, OIIO::stride_t dst_xstride,
+                            OIIO::stride_t dst_ystride, OIIO::stride_t dst_zstride, int p1, int p2,
                             int nthreads) -> bool;
 
 auto add_dither(int nchannels, int width, int height, int depth, float* data,
-                long xstride, long ystride, long zstride, float ditheramplitude,
+                OIIO::stride_t xstride, OIIO::stride_t ystride, OIIO::stride_t zstride, float ditheramplitude,
                 int alpha_channel, int z_channel, unsigned int ditherseed,
                 int chorigin, int xorigin, int yorigin, int zorigin) -> void;
 
 auto premult(int nchannels, int width, int height, int depth, int chbegin,
-             int chend, OIIO::TypeDesc datatype, void* data, long xstride,
-             long ystride, long zstride, int alpha_channel, int z_channel)
+             int chend, OIIO::TypeDesc datatype, void* data, OIIO::stride_t xstride,
+             OIIO::stride_t ystride, OIIO::stride_t zstride, int alpha_channel, int z_channel)
     -> void;
 
 auto copy_image(int nchannels, int width, int height, int depth,
-                const void* src, long pixelsize, long src_xstride,
-                long src_ystride, long src_zstride, void* dst, long dst_xstride,
-                long dst_ystride, long dst_zstride) -> bool;
+                const void* src, OIIO::stride_t pixelsize, OIIO::stride_t src_xstride,
+                OIIO::stride_t src_ystride, OIIO::stride_t src_zstride, void* dst, OIIO::stride_t dst_xstride,
+                OIIO::stride_t dst_ystride, OIIO::stride_t dst_zstride) -> bool;
 
 auto wrap_black(int& coord, int origin, int width) -> bool;
 

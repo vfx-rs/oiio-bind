@@ -964,7 +964,7 @@ pub struct ImageHandle<'cache> {
 }
 
 pub struct Tile<'cache> {
-    pub(crate) ptr: *mut sys::OIIO_ImageCache_Tile_t,
+    pub(crate) ptr: *mut sys::OIIO_pvt_ImageCacheTile_t,
     cache: &'cache ImageCache,
 }
 

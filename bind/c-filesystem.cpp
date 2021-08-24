@@ -72,10 +72,10 @@ CPPMM_IGNORE
 auto fopen(OIIO::string_view path, OIIO::string_view mode) -> _IO_FILE*;
 
 CPPMM_IGNORE
-auto fseek(_IO_FILE* file, long offset, int whence) -> int;
+auto fseek(_IO_FILE* file, int64_t offset, int whence) -> int;
 
 CPPMM_IGNORE
-auto ftell(_IO_FILE* file) -> long;
+auto ftell(_IO_FILE* file) -> int64_t;
 
 auto current_path() -> std::string;
 
@@ -91,15 +91,15 @@ auto read_text_file(OIIO::string_view filename, std::string& str) -> bool;
 
 auto write_text_file(OIIO::string_view filename, OIIO::string_view str) -> bool;
 
-auto read_bytes(OIIO::string_view path, void* buffer, unsigned long n,
-                unsigned long pos) -> unsigned long;
+auto read_bytes(OIIO::string_view path, void* buffer, size_t n,
+                size_t pos) -> size_t;
 
-auto last_write_time(OIIO::string_view path) -> long;
+auto last_write_time(OIIO::string_view path) -> int64_t;
 
 CPPMM_IGNORE
-auto last_write_time(OIIO::string_view path, long time) -> void;
+auto last_write_time(OIIO::string_view path, int64_t time) -> void;
 
-auto file_size(OIIO::string_view path) -> unsigned long;
+auto file_size(OIIO::string_view path) -> size_t;
 
 auto convert_native_arguments(int argc, const char** argv) -> void;
 
@@ -142,25 +142,25 @@ struct IOProxy {
     auto proxytype() const -> const char*;
     auto close() -> void;
     auto opened() const -> bool;
-    auto tell() -> long;
+    auto tell() -> int64_t;
 
-    auto seek(long offset) -> bool;
-    auto read(void* buf, unsigned long size) -> unsigned long;
-    auto write(const void* buf, unsigned long size) -> unsigned long;
+    auto seek(int64_t offset) -> bool;
+    auto read(void* buf, size_t size) -> size_t;
+    auto write(const void* buf, size_t size) -> size_t;
 
-    auto pread(void* buf, unsigned long size, long offset) -> unsigned long;
-    auto pwrite(const void* buf, unsigned long size, long offset)
-        -> unsigned long;
-    auto size() const -> unsigned long;
+    auto pread(void* buf, size_t size, int64_t offset) -> size_t;
+    auto pwrite(const void* buf, size_t size, int64_t offset)
+        -> size_t;
+    auto size() const -> size_t;
     auto flush() const -> void;
     auto mode() const -> OIIO::Filesystem::IOProxy::Mode;
     auto filename() const -> const std::string&;
-    template <typename T> auto read(OIIO::span<T, -1> buf) -> unsigned long;
-    template <typename T> auto write(OIIO::span<T, -1> buf) -> unsigned long;
+    template <typename T> auto read(OIIO::span<T, -1> buf) -> size_t;
+    template <typename T> auto write(OIIO::span<T, -1> buf) -> size_t;
 
     CPPMM_RENAME(write_string_view)
-    CPPMM_IGNORE auto write(OIIO::string_view buf) -> unsigned long;
-    bool seek(long offset, int origin)
+    CPPMM_IGNORE auto write(OIIO::string_view buf) -> size_t;
+    bool seek(int64_t offset, int origin)
         CPPMM_RENAME(seek_with_origin) CPPMM_IGNORE;
 
     auto error() const -> std::string;
@@ -186,25 +186,25 @@ struct IOFile {
     auto proxytype() const -> const char*;
     auto close() -> void;
     auto opened() const -> bool;
-    auto tell() -> long;
-    auto seek(long offset) -> bool;
-    auto read(void* buf, unsigned long size) -> unsigned long;
-    auto write(const void* buf, unsigned long size) -> unsigned long;
+    auto tell() -> int64_t;
+    auto seek(int64_t offset) -> bool;
+    auto read(void* buf, size_t size) -> size_t;
+    auto write(const void* buf, size_t size) -> size_t;
 
     CPPMM_RENAME(write_string_view)
-    CPPMM_IGNORE auto write(OIIO::string_view buf) -> unsigned long;
-    bool seek(long offset, int origin)
+    CPPMM_IGNORE auto write(OIIO::string_view buf) -> size_t;
+    bool seek(int64_t offset, int origin)
         CPPMM_RENAME(seek_with_origin) CPPMM_IGNORE;
 
-    auto pread(void* buf, unsigned long size, long offset) -> unsigned long;
-    auto pwrite(const void* buf, unsigned long size, long offset)
-        -> unsigned long;
-    auto size() const -> unsigned long;
+    auto pread(void* buf, size_t size, int64_t offset) -> size_t;
+    auto pwrite(const void* buf, size_t size, int64_t offset)
+        -> size_t;
+    auto size() const -> size_t;
     auto flush() const -> void;
     auto mode() const -> OIIO::Filesystem::IOProxy::Mode;
     auto filename() const -> const std::string&;
-    template <typename T> auto read(OIIO::span<T, -1> buf) -> unsigned long;
-    template <typename T> auto write(OIIO::span<T, -1> buf) -> unsigned long;
+    template <typename T> auto read(OIIO::span<T, -1> buf) -> size_t;
+    template <typename T> auto write(OIIO::span<T, -1> buf) -> size_t;
     auto error() const -> std::string;
 
     CPPMM_IGNORE
@@ -229,23 +229,23 @@ struct IOVecOutput {
     auto proxytype() const -> const char*;
     auto close() -> void;
     auto opened() const -> bool;
-    auto tell() -> long;
-    auto seek(long offset) -> bool;
-    auto read(void* buf, unsigned long size) -> unsigned long;
-    auto write(const void* buf, unsigned long size) -> unsigned long;
-    auto pread(void* buf, unsigned long size, long offset) -> unsigned long;
-    auto pwrite(const void* buf, unsigned long size, long offset)
-        -> unsigned long;
-    auto size() const -> unsigned long;
+    auto tell() -> int64_t;
+    auto seek(int64_t offset) -> bool;
+    auto read(void* buf, size_t size) -> size_t;
+    auto write(const void* buf, size_t size) -> size_t;
+    auto pread(void* buf, size_t size, int64_t offset) -> size_t;
+    auto pwrite(const void* buf, size_t size, int64_t offset)
+        -> size_t;
+    auto size() const -> size_t;
     auto flush() const -> void;
     auto mode() const -> OIIO::Filesystem::IOProxy::Mode;
     auto filename() const -> const std::string&;
-    template <typename T> auto read(OIIO::span<T, -1> buf) -> unsigned long;
-    template <typename T> auto write(OIIO::span<T, -1> buf) -> unsigned long;
+    template <typename T> auto read(OIIO::span<T, -1> buf) -> size_t;
+    template <typename T> auto write(OIIO::span<T, -1> buf) -> size_t;
 
     CPPMM_RENAME(write_string_view)
-    CPPMM_IGNORE auto write(OIIO::string_view buf) -> unsigned long;
-    bool seek(long offset, int origin)
+    CPPMM_IGNORE auto write(OIIO::string_view buf) -> size_t;
+    bool seek(int64_t offset, int origin)
         CPPMM_RENAME(seek_with_origin) CPPMM_IGNORE;
 
     CPPMM_RENAME(error_const)
@@ -265,31 +265,31 @@ struct IOMemReader {
     auto proxytype() const -> const char*;
     auto close() -> void;
     auto opened() const -> bool;
-    auto tell() -> long;
-    auto seek(long offset) -> bool;
-    auto read(void* buf, unsigned long size) -> unsigned long;
-    auto write(const void* buf, unsigned long size) -> unsigned long;
-    auto pread(void* buf, unsigned long size, long offset) -> unsigned long;
-    auto pwrite(const void* buf, unsigned long size, long offset)
-        -> unsigned long;
-    auto size() const -> unsigned long;
+    auto tell() -> int64_t;
+    auto seek(int64_t offset) -> bool;
+    auto read(void* buf, size_t size) -> size_t;
+    auto write(const void* buf, size_t size) -> size_t;
+    auto pread(void* buf, size_t size, int64_t offset) -> size_t;
+    auto pwrite(const void* buf, size_t size, int64_t offset)
+        -> size_t;
+    auto size() const -> size_t;
     auto flush() const -> void;
     auto mode() const -> OIIO::Filesystem::IOProxy::Mode;
     auto filename() const -> const std::string&;
-    template <typename T> auto read(OIIO::span<T, -1> buf) -> unsigned long;
-    template <typename T> auto write(OIIO::span<T, -1> buf) -> unsigned long;
+    template <typename T> auto read(OIIO::span<T, -1> buf) -> size_t;
+    template <typename T> auto write(OIIO::span<T, -1> buf) -> size_t;
     auto error() const -> std::string;
 
     CPPMM_RENAME(write_string_view)
-    CPPMM_IGNORE auto write(OIIO::string_view buf) -> unsigned long;
-    bool seek(long offset, int origin)
+    CPPMM_IGNORE auto write(OIIO::string_view buf) -> size_t;
+    bool seek(int64_t offset, int origin)
         CPPMM_RENAME(seek_with_origin) CPPMM_IGNORE;
 
     CPPMM_IGNORE
     auto error(OIIO::string_view e) -> void;
 
     CPPMM_RENAME(from_buf)
-    IOMemReader(void* buf, unsigned long size);
+    IOMemReader(void* buf, size_t size);
 
     CPPMM_IGNORE
     IOMemReader(OIIO::span<const unsigned char, -1> buf);

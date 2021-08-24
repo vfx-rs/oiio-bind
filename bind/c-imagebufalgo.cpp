@@ -29,7 +29,7 @@ struct Image_or_Const {
     Image_or_Const(const std::vector<float, std::allocator<float>>& val);
 
     CPPMM_RENAME(from_float_array)
-    Image_or_Const(const float* v, unsigned long s);
+    Image_or_Const(const float* v, size_t s);
 
     CPPMM_IGNORE
     Image_or_Const(const float* v, int s);
@@ -575,13 +575,13 @@ CPPMM_IGNORE
 auto isMonochrome(const OIIO::ImageBuf& src, OIIO::ROI roi, int nthreads)
     -> bool;
 
-auto color_count(const OIIO::ImageBuf& src, unsigned long* count, int ncolors,
+auto color_count(const OIIO::ImageBuf& src, size_t* count, int ncolors,
                  OIIO::span<const float, -1> color,
                  OIIO::span<const float, -1> eps, OIIO::ROI roi, int nthreads)
     -> bool;
 
-auto color_range_check(const OIIO::ImageBuf& src, unsigned long* lowcount,
-                       unsigned long* highcount, unsigned long* inrangecount,
+auto color_range_check(const OIIO::ImageBuf& src, size_t* lowcount,
+                       size_t* highcount, size_t* inrangecount,
                        OIIO::span<const float, -1> low,
                        OIIO::span<const float, -1> high, OIIO::ROI roi,
                        int nthreads) -> bool;
@@ -595,19 +595,19 @@ auto computePixelHashSHA1(const OIIO::ImageBuf& src,
 
 auto histogram(const OIIO::ImageBuf& src, int channel, int bins, float min,
                float max, bool ignore_empty, OIIO::ROI roi, int nthreads)
-    -> std::vector<unsigned long, std::allocator<unsigned long>>;
+    -> std::vector<size_t, std::allocator<size_t>>;
 
 CPPMM_IGNORE
 auto histogram(
     const OIIO::ImageBuf& src, int channel,
-    std::vector<unsigned long, std::allocator<unsigned long>>& histogram,
-    int bins, float min, float max, unsigned long* submin,
-    unsigned long* supermax, OIIO::ROI roi) -> bool;
+    std::vector<size_t, std::allocator<size_t>>& histogram,
+    int bins, float min, float max, size_t* submin,
+    size_t* supermax, OIIO::ROI roi) -> bool;
 
 CPPMM_IGNORE
 auto histogram_draw(
     OIIO::ImageBuf& dst,
-    const std::vector<unsigned long, std::allocator<unsigned long>>& histogram)
+    const std::vector<size_t, std::allocator<size_t>>& histogram)
     -> bool;
 
 auto make_kernel(OIIO::string_view name, float width, float height, float depth,
@@ -964,13 +964,13 @@ auto isConstantColor(const OIIO::ImageBuf& src, float* color, OIIO::ROI roi,
                      int nthreads) -> bool;
 
 CPPMM_IGNORE
-auto color_count(const OIIO::ImageBuf& src, unsigned long* count, int ncolors,
+auto color_count(const OIIO::ImageBuf& src, size_t* count, int ncolors,
                  const float* color, const float* eps, OIIO::ROI roi,
                  int nthreads) -> bool;
 
 CPPMM_IGNORE
-auto color_range_check(const OIIO::ImageBuf& src, unsigned long* lowcount,
-                       unsigned long* highcount, unsigned long* inrangecount,
+auto color_range_check(const OIIO::ImageBuf& src, size_t* lowcount,
+                       size_t* highcount, size_t* inrangecount,
                        const float* low, const float* high, OIIO::ROI roi,
                        int nthreads) -> bool;
 

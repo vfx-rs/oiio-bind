@@ -18,7 +18,7 @@ struct DeepData {
     auto clear() -> void;
     auto free() -> void;
 
-    auto init(long npix, int nchan,
+    auto init(int64_t npix, int nchan,
               OIIO::span<const OIIO::TypeDesc, -1> channeltypes,
               OIIO::span<const std::string, -1> channelnames) -> void;
 
@@ -27,7 +27,7 @@ struct DeepData {
 
     auto initialized() const -> bool;
     auto allocated() const -> bool;
-    auto pixels() const -> long;
+    auto pixels() const -> int64_t;
     auto channels() const -> int;
     auto Z_channel() const -> int;
     auto Zback_channel() const -> int;
@@ -37,29 +37,29 @@ struct DeepData {
     auto AB_channel() const -> int;
     auto channelname(int c) const -> OIIO::string_view;
     auto channeltype(int c) const -> OIIO::TypeDesc;
-    auto channelsize(int c) const -> unsigned long;
-    auto samplesize() const -> unsigned long;
-    auto samples(long pixel) const -> int;
-    auto set_samples(long pixel, int samps) -> void;
+    auto channelsize(int c) const -> size_t;
+    auto samplesize() const -> size_t;
+    auto samples(int64_t pixel) const -> int;
+    auto set_samples(int64_t pixel, int samps) -> void;
     auto set_all_samples(OIIO::span<const unsigned int, -1> samples) -> void;
-    auto set_capacity(long pixel, int samps) -> void;
-    auto capacity(long pixel) const -> int;
-    auto insert_samples(long pixel, int samplepos, int n) -> void;
-    auto erase_samples(long pixel, int samplepos, int n) -> void;
-    auto deep_value(long pixel, int channel, int sample) const -> float;
-    auto deep_value_uint(long pixel, int channel, int sample) const
+    auto set_capacity(int64_t pixel, int samps) -> void;
+    auto capacity(int64_t pixel) const -> int;
+    auto insert_samples(int64_t pixel, int samplepos, int n) -> void;
+    auto erase_samples(int64_t pixel, int samplepos, int n) -> void;
+    auto deep_value(int64_t pixel, int channel, int sample) const -> float;
+    auto deep_value_uint(int64_t pixel, int channel, int sample) const
         -> unsigned int;
-    auto set_deep_value(long pixel, int channel, int sample, float value)
+    auto set_deep_value(int64_t pixel, int channel, int sample, float value)
         -> void;
 
     CPPMM_RENAME(set_deep_value_uint)
-    auto set_deep_value(long pixel, int channel, int sample, unsigned int value)
+    auto set_deep_value(int64_t pixel, int channel, int sample, unsigned int value)
         -> void;
 
-    auto data_ptr(long pixel, int channel, int sample) -> void*;
+    auto data_ptr(int64_t pixel, int channel, int sample) -> void*;
 
     CPPMM_RENAME(data_ptr_const)
-    auto data_ptr(long pixel, int channel, int sample) const -> const void*;
+    auto data_ptr(int64_t pixel, int channel, int sample) const -> const void*;
 
     auto all_channeltypes() const -> OIIO::span<const OIIO::TypeDesc, -1>;
     auto all_samples() const -> OIIO::span<const unsigned int, -1>;
@@ -68,17 +68,17 @@ struct DeepData {
     CPPMM_IGNORE
     auto get_pointers(std::vector<void*>& pointers) const -> void;
 
-    auto copy_deep_sample(long pixel, int sample, const OIIO::DeepData& src,
-                          long srcpixel, int srcsample) -> bool;
-    auto copy_deep_pixel(long pixel, const OIIO::DeepData& src, long srcpixel)
+    auto copy_deep_sample(int64_t pixel, int sample, const OIIO::DeepData& src,
+                          int64_t srcpixel, int srcsample) -> bool;
+    auto copy_deep_pixel(int64_t pixel, const OIIO::DeepData& src, int64_t srcpixel)
         -> bool;
-    auto split(long pixel, float depth) -> bool;
-    auto sort(long pixel) -> void;
-    auto merge_overlaps(long pixel) -> void;
-    auto merge_deep_pixels(long pixel, const OIIO::DeepData& src, int srcpixel)
+    auto split(int64_t pixel, float depth) -> bool;
+    auto sort(int64_t pixel) -> void;
+    auto merge_overlaps(int64_t pixel) -> void;
+    auto merge_deep_pixels(int64_t pixel, const OIIO::DeepData& src, int srcpixel)
         -> void;
-    auto opaque_z(long pixel) const -> float;
-    auto occlusion_cull(long pixel) -> void;
+    auto opaque_z(int64_t pixel) const -> float;
+    auto occlusion_cull(int64_t pixel) -> void;
 } CPPMM_OPAQUEPTR; // struct DeepData
 
 } // namespace OIIO_NAMESPACE

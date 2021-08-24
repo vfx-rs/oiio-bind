@@ -13,17 +13,17 @@ template <class T> struct image_view {
     image_view<T>();
     image_view<T>(const OIIO::image_view<T>& copy);
     image_view<T>(T* data, int nchannels, int width, int height, int depth,
-                  long chanstride, long xstride, long ystride, long zstride);
+                  int64_t chanstride, int64_t xstride, int64_t ystride, int64_t zstride);
     auto operator=(const OIIO::image_view<T>& copy) -> OIIO::image_view<T>&;
     auto operator()(int x, int y, int z) -> OIIO::strided_ptr<T, 1>;
     auto nchannels() const -> int;
     auto width() const -> int;
     auto height() const -> int;
     auto depth() const -> int;
-    auto chanstride() const -> long;
-    auto xstride() const -> long;
-    auto ystride() const -> long;
-    auto zstride() const -> long;
+    auto chanstride() const -> int64_t;
+    auto xstride() const -> int64_t;
+    auto ystride() const -> int64_t;
+    auto zstride() const -> int64_t;
     auto data() const -> const T*;
     auto clear() -> void;
 } CPPMM_OPAQUEBYTES; // struct image_view

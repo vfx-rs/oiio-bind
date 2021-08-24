@@ -26,7 +26,7 @@ impl From<&str> for StringView {
             sys::OIIO_string_view_from_char_array(
                 &mut sv,
                 s.as_ptr() as *const i8,
-                s.len() as u64,
+                s.len(),
             );
 
             StringView(sv)

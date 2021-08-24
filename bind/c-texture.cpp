@@ -294,7 +294,7 @@ struct TextureSystem {
         CPPMM_RENAME(environment_handle);
 
     bool texture(OIIO::ustring filename, OIIO::TextureOptBatch& options,
-                 unsigned long mask, const float* s, const float* t,
+                 OIIO::Tex::RunMask mask, const float* s, const float* t,
                  const float* dsdx, const float* dtdx, const float* dsdy,
                  const float* dtdy, int nchannels, float* result,
                  float* dresultds, float* dresultdt)
@@ -302,7 +302,7 @@ struct TextureSystem {
 
     bool texture(OIIO::TextureSystem::TextureHandle* texture_handle,
                  OIIO::TextureSystem::Perthread* thread_info,
-                 OIIO::TextureOptBatch& options, unsigned long mask,
+                 OIIO::TextureOptBatch& options, OIIO::Tex::RunMask mask,
                  const float* s, const float* t, const float* dsdx,
                  const float* dtdx, const float* dsdy, const float* dtdy,
                  int nchannels, float* result, float* dresultds,
@@ -326,14 +326,14 @@ struct TextureSystem {
                  float* dresultds, float* dresultdt) CPPMM_IGNORE;
 
     bool texture3d(OIIO::ustring filename, OIIO::TextureOptBatch& options,
-                   unsigned long mask, const float* P, const float* dPdx,
+                   OIIO::Tex::RunMask mask, const float* P, const float* dPdx,
                    const float* dPdy, const float* dPdz, int nchannels,
                    float* result, float* dresultds, float* dresultdt,
                    float* dresultdr) CPPMM_RENAME(texture3d_batch);
 
     bool texture3d(OIIO::TextureSystem::TextureHandle* texture_handle,
                    OIIO::TextureSystem::Perthread* thread_info,
-                   OIIO::TextureOptBatch& options, unsigned long mask,
+                   OIIO::TextureOptBatch& options, OIIO::Tex::RunMask mask,
                    const float* P, const float* dPdx, const float* dPdy,
                    const float* dPdz, int nchannels, float* result,
                    float* dresultds, float* dresultdt, float* dresultdr)
@@ -360,14 +360,14 @@ struct TextureSystem {
                    float* dresultdr) CPPMM_IGNORE;
 
     bool environment(OIIO::ustring filename, OIIO::TextureOptBatch& options,
-                     unsigned long mask, const float* R, const float* dRdx,
+                     OIIO::Tex::RunMask mask, const float* R, const float* dRdx,
                      const float* dRdy, int nchannels, float* result,
                      float* dresultds, float* dresultdt)
         CPPMM_RENAME(environment_batch);
 
     bool environment(OIIO::TextureSystem::TextureHandle* texture_handle,
                      OIIO::TextureSystem::Perthread* thread_info,
-                     OIIO::TextureOptBatch& options, unsigned long mask,
+                     OIIO::TextureOptBatch& options, OIIO::Tex::RunMask mask,
                      const float* R, const float* dRdx, const float* dRdy,
                      int nchannels, float* result, float* dresultds,
                      float* dresultdt) CPPMM_RENAME(environment_handle_batch);
@@ -391,13 +391,13 @@ struct TextureSystem {
                      float* dresultdt) CPPMM_IGNORE;
 
     bool shadow(OIIO::ustring filename, OIIO::TextureOptBatch& options,
-                unsigned long mask, const float* P, const float* dPdx,
+                OIIO::Tex::RunMask mask, const float* P, const float* dPdx,
                 const float* dPdy, float* result, float* dresultds,
                 float* dresultdt) CPPMM_RENAME(shadow_batch);
 
     bool shadow(OIIO::TextureSystem::TextureHandle* texture_handle,
                 OIIO::TextureSystem::Perthread* thread_info,
-                OIIO::TextureOptBatch& options, unsigned long mask,
+                OIIO::TextureOptBatch& options, OIIO::Tex::RunMask mask,
                 const float* P, const float* dPdx, const float* dPdy,
                 float* result, float* dresultds, float* dresultdt)
         CPPMM_RENAME(shadow_handle_batch);

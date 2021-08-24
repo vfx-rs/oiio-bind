@@ -16,7 +16,7 @@ struct string_view {
     string_view(const OIIO::string_view& copy);
 
     CPPMM_RENAME(from_char_array)
-    string_view(const char* chars, unsigned long len);
+    string_view(const char* chars, size_t len);
 
     CPPMM_RENAME(from_c_str)
     string_view(const char* chars);
@@ -48,13 +48,13 @@ struct string_view {
     CPPMM_IGNORE
     auto crend() const -> std::reverse_iterator<const char*>;
 
-    auto size() const -> unsigned long;
-    auto length() const -> unsigned long;
-    auto max_size() const -> unsigned long;
+    auto size() const -> size_t;
+    auto length() const -> size_t;
+    auto max_size() const -> size_t;
     auto empty() const -> bool;
 
-    auto operator[](unsigned long pos) const -> const char&;
-    auto at(unsigned long pos) const -> const char&;
+    auto operator[](size_t pos) const -> const char&;
+    auto at(size_t pos) const -> const char&;
 
     CPPMM_IGNORE
     auto front() const -> const char&;
@@ -66,56 +66,56 @@ struct string_view {
 
     auto clear() -> void;
     CPPMM_IGNORE
-    auto remove_prefix(unsigned long n) -> void;
+    auto remove_prefix(size_t n) -> void;
 
     CPPMM_IGNORE
-    auto remove_suffix(unsigned long n) -> void;
+    auto remove_suffix(size_t n) -> void;
 
     CPPMM_IGNORE
-    auto substr(unsigned long pos, unsigned long n) const -> OIIO::string_view;
+    auto substr(size_t pos, size_t n) const -> OIIO::string_view;
 
     CPPMM_IGNORE
     auto compare(OIIO::string_view x) const -> int;
 
     CPPMM_IGNORE
-    auto find(OIIO::string_view s, unsigned long pos) const -> unsigned long;
+    auto find(OIIO::string_view s, size_t pos) const -> size_t;
 
     CPPMM_IGNORE
-    auto find(char c, unsigned long pos) const -> unsigned long;
+    auto find(char c, size_t pos) const -> size_t;
 
     CPPMM_IGNORE
-    auto rfind(OIIO::string_view s, unsigned long pos) const -> unsigned long;
+    auto rfind(OIIO::string_view s, size_t pos) const -> size_t;
 
     CPPMM_IGNORE
-    auto rfind(char c, unsigned long pos) const -> unsigned long;
+    auto rfind(char c, size_t pos) const -> size_t;
 
     CPPMM_IGNORE
-    auto find_first_of(char c, unsigned long pos) const -> unsigned long;
+    auto find_first_of(char c, size_t pos) const -> size_t;
 
     CPPMM_IGNORE
-    auto find_last_of(char c, unsigned long pos) const -> unsigned long;
+    auto find_last_of(char c, size_t pos) const -> size_t;
 
     CPPMM_IGNORE
-    auto find_first_of(OIIO::string_view s, unsigned long pos) const
-        -> unsigned long;
+    auto find_first_of(OIIO::string_view s, size_t pos) const
+        -> size_t;
 
     CPPMM_IGNORE
-    auto find_last_of(OIIO::string_view s, unsigned long pos) const
-        -> unsigned long;
+    auto find_last_of(OIIO::string_view s, size_t pos) const
+        -> size_t;
 
     CPPMM_IGNORE
-    auto find_first_not_of(OIIO::string_view s, unsigned long pos) const
-        -> unsigned long;
+    auto find_first_not_of(OIIO::string_view s, size_t pos) const
+        -> size_t;
 
     CPPMM_IGNORE
-    auto find_first_not_of(char c, unsigned long pos) const -> unsigned long;
+    auto find_first_not_of(char c, size_t pos) const -> size_t;
 
     CPPMM_IGNORE
-    auto find_last_not_of(OIIO::string_view s, unsigned long pos) const
-        -> unsigned long;
+    auto find_last_not_of(OIIO::string_view s, size_t pos) const
+        -> size_t;
 
     CPPMM_IGNORE
-    auto find_last_not_of(char c, unsigned long pos) const -> unsigned long;
+    auto find_last_not_of(char c, size_t pos) const -> size_t;
 
     ~string_view();
 

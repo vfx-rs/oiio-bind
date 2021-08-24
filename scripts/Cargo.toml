@@ -1,0 +1,48 @@
+[package]
+name = "PROJECT_NAME-sys"
+version = "MAJOR_VERSION.MINOR_VERSION.PATCH_VERSION"
+description="test package"
+license="BSD-3-Clause"
+authors = ["Anders Langlands <anderslanglands@gmail.com>"]
+edition = "2018"
+exclude = [
+    "thirdparty/oiio/ext/fmt/doc",
+    "thirdparty/oiio/ext/fmt/test",
+    "thirdparty/oiio/ext/fmt/*.rst",
+    "thirdparty/oiio/ext/giflib-5.2.1/doc",
+    "thirdparty/oiio/ext/giflib-5.2.1/pic",
+    "thirdparty/oiio/ext/giflib-5.2.1/tests",
+    "thirdparty/oiio/ext/libjpeg-turbo/.git",
+    "thirdparty/oiio/ext/libjpeg-turbo/doc",
+    "thirdparty/oiio/ext/libjpeg-turbo/java",
+    "thirdparty/oiio/ext/libjpeg-turbo/testimages",
+    "thirdparty/oiio/ext/libpng/.git",
+    "thirdparty/oiio/ext/libraw/.git",
+    "thirdparty/oiio/ext/libtiff/.git",
+    "thirdparty/oiio/ext/libtiff/html",
+    "thirdparty/oiio/ext/libtiff/test",
+    "thirdparty/oiio/ext/libtiff/tools",
+    "thirdparty/oiio/ext/OpenJPEG/.git",
+    "thirdparty/oiio/ext/pugixml/.git",
+    "thirdparty/oiio/ext/pugixml/docs",
+    "thirdparty/oiio/ext/pugixml/tests",
+    "thirdparty/oiio/ext/pybind11/.git",
+    "thirdparty/oiio/ext/pybind11/docs",
+    "thirdparty/oiio/ext/pybind11/tests",
+    "thirdparty/oiio/ext/robin-map/.git",
+    "thirdparty/oiio/ext/robin-map/tests",
+    "thirdparty/oiio/ext/webp/.git",
+    "thirdparty/oiio/ext/webp/examples",
+    "thirdparty/oiio/ext/webp/swig",
+    "thirdparty/oiio/ext/zlib/.git",
+    "thirdparty/oiio/ext/zlib/contrib",
+    "thirdparty/oiio/ext/zlib/doc",
+    "thirdparty/oiio/ext/zlib/examples",
+]
+
+[dependencies]
+openexr-sys = {path="../../../openexr-bind-vfxrs/openexr-sys"}
+
+[build-dependencies]
+cmake = "0.1"
+regex = "1.5.4"
