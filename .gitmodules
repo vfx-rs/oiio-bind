@@ -1,0 +1,3 @@
+[submodule "thirdparty/oiio"]
+	path = thirdparty/oiio
+	url = https://github.com/OpenImageIO/oiio.git
