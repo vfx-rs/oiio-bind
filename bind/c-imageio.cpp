@@ -389,6 +389,23 @@ struct ImageInput {
     static void* operator new(size_t size) CPPMM_IGNORE;
     static void operator delete(void*)CPPMM_IGNORE;
 
+    /// Retrieve a reduced-resolution ("thumbnail") version of the given
+    /// subimage. It is guaranteed to be thread-safe.
+    ///
+    /// @param thumb
+    ///         A reference to an `ImageBuf` which will be overwritten with
+    ///         the thumbnail image.
+    /// @param subimage
+    ///         The index of the subimage in the file whose thumbnail is to
+    ///         be retrieved.
+    /// @returns
+    ///         `true` upon success, `false` if no thumbnail was available,
+    ///         or if this file format (or reader) does not support
+    ///         thumbnails.
+    ///
+    /// @note This method was added to OpenImageIO 2.3.
+    virtual bool get_thumbnail(OIIO::ImageBuf& thumb, int subimage);
+
 } CPPMM_OPAQUEPTR; // struct ImageInput
 
 struct ImageOutput {
@@ -469,6 +486,20 @@ struct ImageOutput {
 
     static void* operator new(size_t size) CPPMM_IGNORE;
     static void operator delete(void*)CPPMM_IGNORE;
+
+    /// Specify a reduced-resolution ("thumbnail") version of the image.
+    /// Note that many image formats may require the thumbnail to be
+    /// specified prior to writing the pixels.
+    ///
+    /// @param thumb
+    ///         A reference to an `ImageBuf` containing the thumbnail image.
+    /// @returns
+    ///         `true` upon success, `false` if it was not possible to write
+    ///         the thumbnail, or if this file format (or writer) does not
+    ///         support thumbnails.
+    ///
+    /// @note This method was added to OpenImageIO 2.3.
+    virtual bool set_thumbnail(const OIIO::ImageBuf& thumb);
 
 } CPPMM_OPAQUEPTR; // struct ImageOutput
 

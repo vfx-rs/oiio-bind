@@ -1,8 +1,6 @@
 use crate::error::Error;
 use oiio_sys as sys;
 
-type Result<T, E = Error> = std::result::Result<T, E>;
-
 #[repr(u8)]
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub enum BaseType {

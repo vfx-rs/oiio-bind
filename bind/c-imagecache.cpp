@@ -173,6 +173,41 @@ struct ImageCache {
     auto reset_stats() -> void;
     ~ImageCache() CPPMM_IGNORE;
     auto operator=(const OIIO::ImageCache& rhs) -> OIIO::ImageCache&;
+
+
+    /// Copy into `thumbnail` any associated thumbnail associated with this
+    /// image (for the first subimage by default, or as set by `subimage`).
+    ///
+    /// @param  filename
+    ///             The name of the image.
+    /// @param  thumb
+    ///             ImageBuf into which will be copied the thumbnail, if it
+    ///             exists. If no thumbnail can be retrieved, `thumb` will
+    ///             be reset to an uninitialized (empty) ImageBuf.
+    /// @param  subimage
+    ///             The subimage to query.
+    /// @returns
+    ///             `true` upon success, `false` upon failure failure (such
+    ///             as being unable to find, open, or read the file, or if
+    ///             it does not contain a thumbnail).
+    virtual bool get_thumbnail (OIIO::ustring filename, OIIO::ImageBuf& thumbnail,
+                                int subimage);
+
+    /// A more efficient variety of `get_thumbnail()` for cases where you
+    /// can use an `ImageHandle*` to specify the image and optionally have a
+    /// `Perthread*` for the calling thread.
+    virtual bool get_thumbnail (OIIO::pvt::ImageCacheFile *file, OIIO::pvt::ImageCachePerThreadInfo *thread_info,
+                                OIIO::ImageBuf& thumbnail, int subimage) CPPMM_RENAME(get_thumbnail_with_handle);
+    /// @}
+
+    /// Given a handle, return the filename for that image.
+    ///
+    virtual OIIO::ustring filename_from_handle(OIIO::ImageCache::ImageHandle* handle);
+
+    /// A more efficient variety of `invalidate()` for cases where you
+    /// already have an `ImageHandle*` for the file you want to invalidate.
+    virtual void invalidate(OIIO::ImageCache::ImageHandle* file, bool force) CPPMM_RENAME(invalidate_with_handle);
+
 } CPPMM_OPAQUEPTR; // struct ImageCache
 
 } // namespace OIIO_NAMESPACE

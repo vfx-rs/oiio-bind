@@ -5,6 +5,7 @@ use crate::cppstd::{
 };
 use crate::error::Error;
 use crate::filesystem::IOProxy;
+use crate::imagebuf::ImageBuf;
 use crate::param_list::ParamValue;
 use crate::refptr::{OpaquePtr, Ref, RefMut};
 use crate::string_view::StringView;
@@ -1851,10 +1852,8 @@ impl ImageInput {
         let height = spec.height();
         let depth = spec.depth();
         let chan = spec.num_channels();
-        
-        let chend = read_options
-            .chend
-            .clamp(read_options.chbegin + 1, chan);
+
+        let chend = read_options.chend.clamp(read_options.chbegin + 1, chan);
         let nchannels = chend - read_options.chbegin;
 
         let xs = if read_options.x_stride == Stride::AUTO {
@@ -1864,13 +1863,13 @@ impl ImageInput {
         };
 
         if xs < std::mem::size_of::<T>() * nchannels {
-            return Err(Error::BadStride)
+            return Err(Error::BadStride);
         }
 
         let ys = if read_options.y_stride == Stride::AUTO {
             xs * width
         } else {
-            read_options.y_stride.0 as usize  
+            read_options.y_stride.0 as usize
         };
 
         let zs = if read_options.z_stride == Stride::AUTO {
@@ -2356,6 +2355,40 @@ impl ImageInput {
                 strides.x_stride.0,
                 strides.y_stride.0,
                 strides.z_stride.0,
+            );
+        }
+
+        if result {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    /// Retrieve a reduced-resolution ("thumbnail") version of the given
+    /// subimage.
+    /// 
+    /// # Panics
+    /// * If `subimage` is not representable as an i32
+    ///
+    /// # Errors 
+    /// * [`Error::Oiio`] - If the thumbnail does not exist or could not be 
+    /// loaded
+    ///
+    pub fn get_thumbnail(
+        &self,
+        thumb: &mut ImageBuf,
+        subimage: usize,
+    ) -> Result<()> {
+        let mut result = false;
+        unsafe {
+            sys::OIIO_ImageInput_get_thumbnail(
+                self.ptr,
+                &mut result,
+                thumb.ptr,
+                subimage
+                    .try_into()
+                    .expect("subimage is not representable as i32"),
             );
         }
 
@@ -3177,6 +3210,30 @@ impl ImageOutputBase<ImageOutputStateOpened> {
                 strides.x_stride.0,
                 strides.y_stride.0,
                 strides.z_stride.0,
+            );
+        }
+
+        if result {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    /// Specify a reduced-resolution ("thumbnail") version of the image.
+    /// Note that many image formats may require the thumbnail to be
+    /// specified prior to writing the pixels.
+    ///
+    /// # Errors
+    /// * [`Error::Oiio`] - if the thumbnail could not be setup
+    ///
+    pub fn set_thumbnail(&mut self, thumb: &ImageBuf) -> Result<()> {
+        let mut result = false;
+        unsafe {
+            sys::OIIO_ImageOutput_set_thumbnail(
+                self.ptr,
+                &mut result,
+                thumb.ptr,
             );
         }
 

@@ -1412,6 +1412,61 @@ where
     }
 }
 
+impl ImageBuf {
+    //! Thumbnails
+
+    /// Does this ImageBuf have an associated thumbnail?
+    ///
+    pub fn has_thumbnail(&self) -> bool {
+        let mut result = false;
+        unsafe {
+            sys::OIIO_ImageBuf_has_thumbnail(self.ptr, &mut result);
+        }
+
+        result
+    }
+
+    /// Return a shared pointer to an ImageBuf containing a thumbnail of the
+    /// image (if it existed in the file), which may be empty if there is no
+    /// thumbnail.
+    ///
+    pub fn get_thumbnail(&self) -> ImageBufPtr {
+        let mut ptr = std::ptr::null_mut();
+        unsafe {
+            sys::OIIO_ImageBuf_get_thumbnail(self.ptr, &mut ptr);
+        }
+
+        ImageBufPtr(ptr)
+    }
+
+    /// Reset the thumbnail image associated with this ImageBuf to `thumb`.
+    ///
+    /// # Safety
+    /// This call will invalidate any references previously returned by
+    /// `get_thumbnail()`.
+    ///
+    pub fn set_thumbnail(&mut self, thumb: &ImageBuf) {
+        unsafe {
+            sys::OIIO_ImageBuf_set_thumbnail(self.ptr, thumb.ptr);
+        }
+    }
+
+    /// Clear any thumbnail image associated with this ImageBuf.
+    ///
+    /// # Safety
+    /// This call will invalidate any references previously returned by
+    /// `get_thumbnail()`.
+    ///
+    pub fn clear_thumbnail(&mut self) {
+        unsafe {
+            sys::OIIO_ImageBuf_clear_thumbnail(self.ptr);
+        }
+    }
+}
+
+#[repr(transparent)]
+pub struct ImageBufPtr(pub(crate) *mut sys::std_ImageBufPtr_t);
+
 #[cfg(test)]
 mod tests {
     use crate as oiio;

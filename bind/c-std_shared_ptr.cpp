@@ -1,6 +1,7 @@
 #include <memory>
 
 #include <OpenImageIO/color.h>
+#include <OpenImageIO/imagebuf.h>
 
 // CPPMM_ macro definitions etc automatically inserted in this virtual header
 #include <cppmm_bind.hpp>
@@ -32,8 +33,12 @@ public:
 template class shared_ptr<OIIO::ColorProcessor>;
 using ColorProcessorHandle = ::std::shared_ptr<OIIO::ColorProcessor>;
 
+template class shared_ptr<OIIO::ImageBuf>;
+using ImageBufPtr = ::std::shared_ptr<OIIO::ImageBuf>;
+
 } // namespace std
 
 } // namespace cppmm_bind
 
 template class std::shared_ptr<OIIO::ColorProcessor>;
+template class std::shared_ptr<OIIO::ImageBuf>;

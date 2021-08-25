@@ -468,6 +468,68 @@ struct TextureSystem {
     auto reset_stats() -> void;
     auto imagecache() const -> OIIO::ImageCache*;
     ~TextureSystem() CPPMM_IGNORE;
+
+    /// Given a handle, return the filename for that image.
+    ///
+    virtual OIIO::ustring filename_from_handle(OIIO::TextureSystem::TextureHandle* handle);
+
+    /// @{
+    /// @name Methods for UDIM patterns
+    ///
+
+    /// Is the filename a UDIM pattern?
+    ///
+    /// This method was added in OpenImageIO 2.3.
+    virtual bool is_udim(OIIO::ustring filename) = 0;
+
+    /// Does the handle refer to a file that's a UDIM pattern?
+    ///
+    /// This method was added in OpenImageIO 2.3.
+    virtual bool is_udim(OIIO::TextureSystem::TextureHandle* udimfile) = 0;
+
+    /// For a UDIM filename pattern and texture coordinates, return the
+    /// TextureHandle pointer for the concrete tile file it refers to, or
+    /// nullptr if there is no corresponding tile (udim sets are allowed to
+    /// be sparse).
+    ///
+    /// This method was added in OpenImageIO 2.3.
+    virtual OIIO::TextureSystem::TextureHandle* resolve_udim(OIIO::ustring udimpattern,
+                                        float s, float t) = 0;
+
+    /// A more efficient variety of `resolve_udim()` for cases where you
+    /// have the `TextureHandle*` that corresponds to the "virtual" UDIM
+    /// file and optionally have a `Perthread*` for the calling thread.
+    ///
+    /// This method was added in OpenImageIO 2.3.
+    virtual OIIO::TextureSystem::TextureHandle* resolve_udim(OIIO::TextureSystem::TextureHandle* udimfile,
+                                        OIIO::TextureSystem::Perthread* thread_info,
+                                        float s, float t) = 0;
+
+    /// Produce a full inventory of the set of concrete files comprising the
+    /// UDIM set specified by `udimpattern`.  The apparent number of texture
+    /// atlas tiles in the u and v directions will be written to `nutiles`
+    /// and `nvtiles`, respectively. The vector `filenames` will be sized
+    /// to `ntiles * nvtiles` and filled with the the names of the concrete
+    /// files comprising the atlas, with an empty ustring corresponding to
+    /// any unpopulated tiles (the UDIM set is allowed to be sparse). The
+    /// filename list is indexed as `utile + vtile * nvtiles`.
+    ///
+    /// This method was added in OpenImageIO 2.3.
+    virtual void inventory_udim(OIIO::ustring udimpattern,
+                                std::vector<OIIO::ustring>& filenames,
+                                int& nutiles, int& nvtiles) = 0;
+
+    /// A more efficient variety of `inventory_udim()` for cases where you
+    /// have the `TextureHandle*` that corresponds to the "virtual" UDIM
+    /// file and optionally have a `Perthread*` for the calling thread.
+    ///
+    /// This method was added in OpenImageIO 2.3.
+    virtual void inventory_udim(OIIO::TextureSystem::TextureHandle* udimfile,
+                                OIIO::TextureSystem::Perthread* thread_info,
+                                std::vector<OIIO::ustring>& filenames,
+                                int& nutiles, int& nvtiles) = 0;
+    /// @}
+
 } CPPMM_OPAQUEPTR; // struct TextureSystem
 
 } // namespace OIIO_NAMESPACE

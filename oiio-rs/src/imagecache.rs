@@ -5,6 +5,7 @@ use crate::string_view::StringView;
 use crate::traits::{AttributeMetadata, Pixel};
 use crate::typedesc::TypeDesc;
 use crate::ustring::UString;
+use crate::imagebuf::ImageBuf;
 
 use oiio_sys as sys;
 use std::marker::PhantomData;
@@ -364,7 +365,6 @@ impl ImageCache {
         } else {
             Ok(ImageHandle {
                 ptr,
-                filename,
                 marker: PhantomData,
             })
         }
@@ -372,12 +372,28 @@ impl ImageCache {
 
     /// Return true if the image handle (previously returned by
     /// [`get_image_handle()`](ImageCache::get_image_handle)) is a valid image that can be subsequently read.
+    ///
     pub fn good(&self, handle: &ImageHandle) -> bool {
         let mut result = false;
         unsafe {
             sys::OIIO_ImageCache_good(self.0, &mut result, handle.ptr);
         }
         result
+    }
+
+    /// Given a handle, return the filename for that image.
+    ///
+    pub fn filename_from_handle(&self, handle: &ImageHandle) -> &'static str {
+        let mut result = sys::OIIO_ustring_t::default();
+        unsafe {
+            sys::OIIO_ImageCache_filename_from_handle(
+                self.0,
+                &mut result,
+                handle.ptr,
+            );
+        }
+
+        UString(result).as_str()
     }
 }
 
@@ -825,7 +841,9 @@ impl ImageCache {
     ///
     pub fn invalidate(&self, handle: ImageHandle, force: bool) {
         unsafe {
-            sys::OIIO_ImageCache_invalidate(self.0, handle.filename.0, force);
+            sys::OIIO_ImageCache_invalidate_with_handle(
+                self.0, handle.ptr, force,
+            );
         }
     }
 
@@ -946,6 +964,76 @@ impl ImageCache {
     }
 }
 
+impl ImageCache {
+    //! Accessing thumbnails
+
+    /// Copy into `thumbnail` any thumbnail image associated with the image
+    /// specified by `filename` and `subimage`.
+    ///
+    /// # Errors
+    /// * [`Error::Oiio`] - if there was no thumbmail or it could not be loaded
+    ///
+    pub fn get_thumbnail(
+        &mut self,
+        filename: UString,
+        thumbnail: &mut ImageBuf,
+        subimage: i32,
+    ) -> Result<()> {
+        let mut result = false;
+        unsafe {
+            sys::OIIO_ImageCache_get_thumbnail(
+                self.0,
+                &mut result,
+                filename.0,
+                thumbnail.ptr,
+                subimage,
+            );
+        }
+
+        if result {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    /// Copy into `thumbnail` any thumbnail image associated with the image
+    /// specified by `handle` and `subimage`.
+    ///
+    /// # Errors
+    /// * [`Error::Oiio`] - if there was no thumbmail or it could not be loaded
+    ///
+    pub fn get_thumbnail_with_handle(
+        &mut self,
+        handle: &ImageHandle,
+        per_thread_info: Option<&Perthread>,
+        thumbnail: &mut ImageBuf,
+        subimage: i32,
+    ) -> Result<()> {
+        let mut result = false;
+        unsafe {
+            sys::OIIO_ImageCache_get_thumbnail_with_handle(
+                self.0,
+                &mut result,
+                handle.ptr,
+                if let Some(p) = per_thread_info {
+                    p.0
+                } else {
+                    std::ptr::null_mut()
+                },
+                thumbnail.ptr,
+                subimage,
+            );
+        }
+
+        if result {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+}
+
 impl Drop for ImageCache {
     fn drop(&mut self) {
         unsafe {
@@ -959,7 +1047,6 @@ pub struct Perthread(pub(crate) *mut sys::OIIO_pvt_ImageCachePerThreadInfo_t);
 
 pub struct ImageHandle<'cache> {
     pub(crate) ptr: *mut sys::OIIO_pvt_ImageCacheFile_t,
-    pub(crate) filename: UString,
     pub(crate) marker: PhantomData<&'cache ()>,
 }
 
