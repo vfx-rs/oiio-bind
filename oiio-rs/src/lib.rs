@@ -11,6 +11,7 @@ pub mod string_view;
 pub mod traits;
 pub mod typedesc;
 pub mod ustring;
+pub mod texture;
 
 pub use error::Error;
 

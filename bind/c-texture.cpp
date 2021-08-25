@@ -42,7 +42,7 @@ enum class Wrap {
     PeriodicPow2 = 5,
     PeriodicSharedBorder = 6,
     Last = 7,
-};
+} CPPMM_RUSTIFY_ENUM;
 
 auto decode_wrapmode(const char* name) -> OIIO::Tex::Wrap;
 
@@ -58,70 +58,21 @@ enum class MipMode {
     OneLevel = 2,
     Trilinear = 3,
     Aniso = 4,
-};
+} CPPMM_RUSTIFY_ENUM;
 
 enum class InterpMode {
     Closest = 0,
     Bilinear = 1,
     Bicubic = 2,
     SmartBicubic = 3,
-};
+} CPPMM_RUSTIFY_ENUM;
 
 } // namespace Tex
 
 enum RunFlagVal {
     RunFlagOff = 0,
     RunFlagOn = 255,
-};
-
-// DEPRECATED (1.8)
-/*
-struct TextureOptions {
-    using BoundType = OIIO::TextureOptions;
-
-    TextureOptions();
-    TextureOptions(const OIIO::TextureOpt& opt);
-    static auto decode_wrapmode(const char* name) -> OIIO::TextureOptions::Wrap;
-    static auto decode_wrapmode(OIIO::ustring name)
-        -> OIIO::TextureOptions::Wrap;
-    static auto parse_wrapmodes(const char* wrapmodes,
-                                OIIO::TextureOptions::Wrap& swrapcode,
-                                OIIO::TextureOptions::Wrap& twrapcode) -> void;
-
-    TextureOptions(const OIIO::TextureOptions& rhs);
-
-    CPPMM_IGNORE
-    TextureOptions(OIIO::TextureOptions&&);
-
-    ~TextureOptions();
-
-    enum Wrap {
-        WrapDefault = 0,
-        WrapBlack = 1,
-        WrapClamp = 2,
-        WrapPeriodic = 3,
-        WrapMirror = 4,
-        WrapPeriodicPow2 = 5,
-        WrapPeriodicSharedBorder = 6,
-        WrapLast = 7,
-    };
-
-    enum MipMode {
-        MipModeDefault = 0,
-        MipModeNoMIP = 1,
-        MipModeOneLevel = 2,
-        MipModeTrilinear = 3,
-        MipModeAniso = 4,
-    };
-
-    enum InterpMode {
-        InterpClosest = 0,
-        InterpBilinear = 1,
-        InterpBicubic = 2,
-        InterpSmartBicubic = 3,
-    };
-} CPPMM_OPAQUEBYTES; // struct TextureOptions
-*/
+} CPPMM_RUSTIFY_ENUM;
 
 struct TextureOpt {
     using BoundType = OIIO::TextureOpt;
@@ -171,7 +122,7 @@ struct TextureOpt {
         InterpBicubic = 2,
         InterpSmartBicubic = 3,
     };
-} CPPMM_OPAQUEPTR; // struct TextureOpt
+} CPPMM_VALUETYPE; // struct TextureOpt
 
 struct TextureOptBatch {
     using BoundType = OIIO::TextureOptBatch;
@@ -183,7 +134,7 @@ struct TextureOptBatch {
     CPPMM_IGNORE
     TextureOptBatch(OIIO::TextureOptBatch&&);
     ~TextureOptBatch();
-} CPPMM_OPAQUEPTR; // struct TextureOptBatch
+} CPPMM_VALUETYPE; // struct TextureOptBatch
 
 struct TextureSystem {
     using BoundType = OIIO::TextureSystem;
@@ -249,7 +200,7 @@ struct TextureSystem {
                  OIIO::TextureOpt& options, float s, float t, float dsdx,
                  float dtdx, float dsdy, float dtdy, int nchannels,
                  float* result, float* dresultds, float* dresultdt)
-        CPPMM_RENAME(texture_handle);
+        CPPMM_RENAME(texture_with_handle);
 
     auto texture3d(OIIO::ustring filename, OIIO::TextureOpt& options,
                    const Imath::Vec3<float>& P, const Imath::Vec3<float>& dPdx,
@@ -265,7 +216,7 @@ struct TextureSystem {
                    const Imath::Vec3<float>& dPdy,
                    const Imath::Vec3<float>& dPdz, int nchannels, float* result,
                    float* dresultds, float* dresultdt, float* dresultdr)
-        CPPMM_RENAME(texture3d_handle);
+        CPPMM_RENAME(texture3d_with_handle);
 
     auto shadow(OIIO::ustring filename, OIIO::TextureOpt& options,
                 const Imath::Vec3<float>& P, const Imath::Vec3<float>& dPdx,
@@ -277,7 +228,7 @@ struct TextureSystem {
                 OIIO::TextureOpt& options, const Imath::Vec3<float>& P,
                 const Imath::Vec3<float>& dPdx, const Imath::Vec3<float>& dPdy,
                 float* result, float* dresultds, float* dresultdt)
-        CPPMM_RENAME(shadow_handle);
+        CPPMM_RENAME(shadow_with_handle);
 
     auto environment(OIIO::ustring filename, OIIO::TextureOpt& options,
                      const Imath::Vec3<float>& R,
@@ -291,7 +242,7 @@ struct TextureSystem {
                      const Imath::Vec3<float>& dRdx,
                      const Imath::Vec3<float>& dRdy, int nchannels,
                      float* result, float* dresultds, float* dresultdt)
-        CPPMM_RENAME(environment_handle);
+        CPPMM_RENAME(environment_with_handle);
 
     bool texture(OIIO::ustring filename, OIIO::TextureOptBatch& options,
                  OIIO::Tex::RunMask mask, const float* s, const float* t,
@@ -306,7 +257,7 @@ struct TextureSystem {
                  const float* s, const float* t, const float* dsdx,
                  const float* dtdx, const float* dsdy, const float* dtdy,
                  int nchannels, float* result, float* dresultds,
-                 float* dresultdt) CPPMM_RENAME(texture_handle_batch);
+                 float* dresultdt) CPPMM_RENAME(texture_batch_with_handle);
 
     bool texture(OIIO::ustring filename, OIIO::TextureOptions& options,
                  unsigned char* runflags, int beginactive, int endactive,
@@ -337,7 +288,7 @@ struct TextureSystem {
                    const float* P, const float* dPdx, const float* dPdy,
                    const float* dPdz, int nchannels, float* result,
                    float* dresultds, float* dresultdt, float* dresultdr)
-        CPPMM_RENAME(texture3d_handle_batch);
+        CPPMM_RENAME(texture3d_batch_with_handle);
 
     bool texture3d(OIIO::ustring filename, OIIO::TextureOptions& options,
                    unsigned char* runflags, int beginactive, int endactive,
@@ -370,7 +321,7 @@ struct TextureSystem {
                      OIIO::TextureOptBatch& options, OIIO::Tex::RunMask mask,
                      const float* R, const float* dRdx, const float* dRdy,
                      int nchannels, float* result, float* dresultds,
-                     float* dresultdt) CPPMM_RENAME(environment_handle_batch);
+                     float* dresultdt) CPPMM_RENAME(environment_batch_with_handle);
 
     bool environment(OIIO::ustring filename, OIIO::TextureOptions& options,
                      unsigned char* runflags, int beginactive, int endactive,
@@ -400,7 +351,7 @@ struct TextureSystem {
                 OIIO::TextureOptBatch& options, OIIO::Tex::RunMask mask,
                 const float* P, const float* dPdx, const float* dPdy,
                 float* result, float* dresultds, float* dresultdt)
-        CPPMM_RENAME(shadow_handle_batch);
+        CPPMM_RENAME(shadow_batch_with_handle);
 
     bool shadow(OIIO::ustring filename, OIIO::TextureOptions& options,
                 unsigned char* runflags, int beginactive, int endactive,
@@ -485,7 +436,7 @@ struct TextureSystem {
     /// Does the handle refer to a file that's a UDIM pattern?
     ///
     /// This method was added in OpenImageIO 2.3.
-    virtual bool is_udim(OIIO::TextureSystem::TextureHandle* udimfile) = 0;
+    virtual bool is_udim(OIIO::TextureSystem::TextureHandle* udimfile) CPPMM_RENAME(is_udim_with_handle);
 
     /// For a UDIM filename pattern and texture coordinates, return the
     /// TextureHandle pointer for the concrete tile file it refers to, or
@@ -503,7 +454,7 @@ struct TextureSystem {
     /// This method was added in OpenImageIO 2.3.
     virtual OIIO::TextureSystem::TextureHandle* resolve_udim(OIIO::TextureSystem::TextureHandle* udimfile,
                                         OIIO::TextureSystem::Perthread* thread_info,
-                                        float s, float t) = 0;
+                                        float s, float t) CPPMM_RENAME(resolve_udim_with_handle);
 
     /// Produce a full inventory of the set of concrete files comprising the
     /// UDIM set specified by `udimpattern`.  The apparent number of texture
@@ -527,7 +478,7 @@ struct TextureSystem {
     virtual void inventory_udim(OIIO::TextureSystem::TextureHandle* udimfile,
                                 OIIO::TextureSystem::Perthread* thread_info,
                                 std::vector<OIIO::ustring>& filenames,
-                                int& nutiles, int& nvtiles) = 0;
+                                int& nutiles, int& nvtiles) CPPMM_RENAME(inventory_udim_with_handle);
     /// @}
 
 } CPPMM_OPAQUEPTR; // struct TextureSystem
