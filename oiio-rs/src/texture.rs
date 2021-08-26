@@ -1,10 +1,8 @@
 use crate::cppstd::CppString;
 use crate::error::Error;
-use crate::filesystem::IOProxy;
 use crate::imagecache::ImageCache;
 use crate::imageio::{
-    get_trampoline, ImageOutputOpened, ImageSpec, ImageSpecRef, Roi, Stride,
-    Strides,
+    ImageSpec, ImageSpecRef, 
 };
 use crate::traits::AttributeMetadata;
 use crate::typedesc::TypeDesc;
@@ -221,7 +219,6 @@ impl TextureSystem {
     pub fn get_attribute<A: AttributeMetadata>(
         &self,
         name: &str,
-        case_sensitive: bool,
     ) -> Option<A> {
         let mut ok = false;
         let mut result = A::default();
@@ -1335,6 +1332,7 @@ impl TextureSystem {
         &mut self,
         filename: UString,
         options: &mut TextureOptBatch,
+        mask: u64,
         s: &[f32],
         t: &[f32],
         dsdx: &[f32],
@@ -1352,20 +1350,20 @@ impl TextureSystem {
         if s.len() != BATCH_WIDTH
             || t.len() != BATCH_WIDTH
             || dsdx.len() != BATCH_WIDTH
-            || dtdx != BATCH_WIDTH
-            || dsdy != BATCH_WIDTH
-            || dtdy != BATCH_WIDTH
+            || dtdx.len() != BATCH_WIDTH
+            || dsdy.len() != BATCH_WIDTH
+            || dtdy.len() != BATCH_WIDTH
         {
             panic!("input coordinates or their derivatives are not BATCH_WIDTH in length");
         }
 
-        if let Some(dresultds) = dresultds {
+        if let Some(ref dresultds) = dresultds {
             if result.len() != dresultds.len() {
                 panic!("dresultds length  != result length");
             }
         }
 
-        if let Some(dresultdt) = dresultdt {
+        if let Some(ref dresultdt) = dresultdt {
             if result.len() != dresultdt.len() {
                 panic!("dresultdt length  != result length");
             }
@@ -1384,10 +1382,9 @@ impl TextureSystem {
                 dtdx.as_ptr(),
                 dsdy.as_ptr(),
                 dtdy.as_ptr(),
-                result
-                    .len()
+                num_channels
                     .try_into()
-                    .expect("result.len not representable as i32"),
+                    .expect("num channels not representable as i32"),
                 result.as_mut_ptr(),
                 if let Some(sl) = dresultds {
                     sl.as_mut_ptr()
@@ -1408,6 +1405,1419 @@ impl TextureSystem {
             Err(Error::Oiio(self.get_error(true)))
         }
     }
+
+    /// Perform filtered 2D texture lookups on a batch of positions from the
+    /// same texture, all at once.  The parameters `s`, `t`, `dsdx`, `dtdx`,
+    /// and `dsdy`, `dtdy` are each a pointer to `[BatchWidth]` values.  The
+    /// `mask` determines which of those array elements to actually compute.
+    ///
+    /// The float* results act like `float[nchannels][BatchWidth]`, so that
+    /// effectively `result[0..BatchWidth-1]` are the "red" result for each
+    /// lane, `result[BatchWidth..2*BatchWidth-1]` are the "green" results,
+    /// etc. The `dresultds` and `dresultdt` should either both be provided,
+    /// or else both be nullptr (meaning no derivative results are
+    /// required).
+    ///
+    /// * filename
+    ///             The name of the texture.
+    /// * options
+    ///             A TextureOptBatch containing texture lookup options.
+    ///             This is conceptually the same as a TextureOpt, but the
+    ///             following fields are arrays of `[BatchWidth]` elements:
+    ///             sblur, tblur, swidth, twidth. The other fields are, as
+    ///             with TextureOpt, ordinary scalar values.
+    /// * mask
+    ///             A bit-field designating which "lanes" should be
+    ///             computed: if `mask & (1<<i)` is nonzero, then results
+    ///             should be computed and stored for `result[...][i]`.
+    /// * s/t
+    ///             Pointers to the 2D texture coordinates, each as a
+    ///             `float[BatchWidth]`.
+    /// * dsdx/dtdx/dsdy/dtdy
+    ///             The differentials of s and t relative to canonical
+    ///             directions x and y, each as a `float[BatchWidth]`.
+    /// * result[]
+    ///             The result of the filtered texture lookup will be placed
+    ///             here, as `float [nchannels][BatchWidth]`. (Note the
+    ///             "SOA" data layout.)
+    /// * dresultds/dresultdt
+    ///             If non-null, these designate storage locations for the
+    ///             derivatives of result, and like `result` are in SOA
+    ///             layout: `float [nchannels][BatchWidth]`
+    /// @returns
+    ///             `true` upon success, or `false` if the file was not
+    ///             found or could not be opened by any available ImageIO
+    ///             plugin.
+    ///
+    ///
+    /// # Errors
+    /// * [`Error::Oiio`] - if the file was not found or could not be read
+    ///
+    /// # Panics
+    /// * If the sizes of `result`, `dresultds` and `dresultdt` do not match
+    /// * If the length of `result` is not representable as an i32
+    ///
+    pub fn texture_batch_with_handle(
+        &mut self,
+        handle: &TextureHandle,
+        per_thread_info: Option<&mut Perthread>,
+        options: &mut TextureOptBatch,
+        mask: u64,
+        s: &[f32],
+        t: &[f32],
+        dsdx: &[f32],
+        dtdx: &[f32],
+        dsdy: &[f32],
+        dtdy: &[f32],
+        result: &mut [f32],
+        dresultds: Option<&mut [f32]>,
+        dresultdt: Option<&mut [f32]>,
+    ) -> Result<()> {
+        let mut ok = false;
+
+        let num_channels = result.len() / BATCH_WIDTH;
+
+        if s.len() != BATCH_WIDTH
+            || t.len() != BATCH_WIDTH
+            || dsdx.len() != BATCH_WIDTH
+            || dtdx.len() != BATCH_WIDTH
+            || dsdy.len() != BATCH_WIDTH
+            || dtdy.len() != BATCH_WIDTH
+        {
+            panic!("input coordinates or their derivatives are not BATCH_WIDTH in length");
+        }
+
+        if let Some(ref dresultds) = dresultds {
+            if result.len() != dresultds.len() {
+                panic!("dresultds length  != result length");
+            }
+        }
+
+        if let Some(ref dresultdt) = dresultdt {
+            if result.len() != dresultdt.len() {
+                panic!("dresultdt length  != result length");
+            }
+        }
+
+        unsafe {
+            sys::OIIO_TextureSystem_texture_batch_with_handle(
+                self.0,
+                &mut ok,
+                handle.ptr,
+                if let Some(p) = per_thread_info {
+                    p.0
+                } else {
+                    std::ptr::null_mut()
+                },
+                options,
+                mask,
+                s.as_ptr(),
+                t.as_ptr(),
+                dsdx.as_ptr(),
+                dtdx.as_ptr(),
+                dsdy.as_ptr(),
+                dtdy.as_ptr(),
+                num_channels
+                    .try_into()
+                    .expect("num channels not representable as i32"),
+                result.as_mut_ptr(),
+                if let Some(sl) = dresultds {
+                    sl.as_mut_ptr()
+                } else {
+                    std::ptr::null_mut()
+                },
+                if let Some(sl) = dresultdt {
+                    sl.as_mut_ptr()
+                } else {
+                    std::ptr::null_mut()
+                },
+            );
+        }
+
+        if ok {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    /// Perform filtered 3D volumetric texture lookups on a batch of
+    /// positions from the same texture, all at once. The "point-like"
+    /// parameters `P`, `dPdx`, `dPdy`, and `dPdz` are each a pointers to
+    /// arrays of `float value[3][BatchWidth]` (or alternately like
+    /// `Imath::Vec3<FloatWide>`). That is, each one points to all the *x*
+    /// values for the batch, immediately followed by all the *y* values,
+    /// followed by the *z* values. The `mask` determines which of those
+    /// array elements to actually compute.
+    ///
+    /// The various results arrays are also arranged as arrays that behave
+    /// as if they were declared `float result[channels][BatchWidth]`, where
+    /// all the batch values for channel 0 are adjacent, followed by all the
+    /// batch values for channel 1, etc.
+    ///
+    /// * filename
+    ///             The name of the texture.
+    /// * options
+    ///             A TextureOptBatch containing texture lookup options.
+    ///             This is conceptually the same as a TextureOpt, but the
+    ///             following fields are arrays of `[BatchWidth]` elements:
+    ///             sblur, tblur, swidth, twidth. The other fields are, as
+    ///             with TextureOpt, ordinary scalar values.
+    /// * mask
+    ///             A bit-field designating which "lanes" should be
+    ///             computed: if `mask & (1<<i)` is nonzero, then results
+    ///             should be computed and stored for `result[...][i]`.
+    /// * P
+    ///             Pointers to the 3D texture coordinates, each as a
+    ///             `float[3][BatchWidth]`.
+    /// * dPdx/dPdy/dPdz
+    ///             The differentials of P relative to canonical directions
+    ///             x, y, and z, each as a `float[3][BatchWidth]`.
+    /// * nchannels
+    ///             The number of channels of data to retrieve into `result`
+    ///             (e.g., 1 for a single value, 3 for an RGB triple, etc.).
+    /// * result[]
+    ///             The result of the filtered texture lookup will be placed
+    ///             here, as `float [nchannels][BatchWidth]`. (Note the
+    ///             "SOA" data layout.)
+    /// * dresultds/dresultdt/dresultdr
+    ///             If non-null, these designate storage locations for the
+    ///             derivatives of result, and like `result` are in SOA
+    ///             layout: `float [nchannels][BatchWidth]`
+    ///
+    /// # Errors
+    /// * [`Error::Oiio`] - if the file was not found or could not be read
+    ///
+    /// # Panics
+    /// * If the sizes of `result`, `dresultds` and `dresultdt` do not match
+    /// * If the length of `result` is not representable as an i32
+    ///
+    pub fn texture3d_batch<V: Vec3<f32>>(
+        &mut self,
+        filename: UString,
+        options: &mut TextureOptBatch,
+        mask: u64,
+        p: &[V],
+        dpdx: &[V],
+        dpdy: &[V],
+        dpdz: &[V],
+        result: &mut [f32],
+        dresultds: Option<&mut [f32]>,
+        dresultdt: Option<&mut [f32]>,
+        dresultdr: Option<&mut [f32]>,
+    ) -> Result<()> {
+        let mut ok = false;
+
+        let num_channels = result.len() / BATCH_WIDTH;
+
+        if p.len() != BATCH_WIDTH
+            || dpdx.len() != BATCH_WIDTH
+            || dpdy.len() != BATCH_WIDTH
+            || dpdz.len() != BATCH_WIDTH
+        {
+            panic!("input coordinates or their derivatives are not BATCH_WIDTH in length");
+        }
+
+        if let Some(ref dresultds) = dresultds {
+            if result.len() != dresultds.len() {
+                panic!("dresultds length  != result length");
+            }
+        }
+
+        if let Some(ref dresultdt) = dresultdt {
+            if result.len() != dresultdt.len() {
+                panic!("dresultdt length  != result length");
+            }
+        }
+
+        if let Some(ref dresultdr) = dresultdr {
+            if result.len() != dresultdr.len() {
+                panic!("dresultdt length  != result length");
+            }
+        }
+
+        unsafe {
+            sys::OIIO_TextureSystem_texture3d_batch(
+                self.0,
+                &mut ok,
+                filename.0,
+                options,
+                mask,
+                p.as_ptr() as *const f32,
+                dpdx.as_ptr() as *const f32,
+                dpdy.as_ptr() as *const f32,
+                dpdz.as_ptr() as *const f32,
+                num_channels
+                    .try_into()
+                    .expect("num channels is not representable as i32"),
+                result.as_mut_ptr(),
+                if let Some(s) = dresultds {
+                    s.as_mut_ptr()
+                } else {
+                    std::ptr::null_mut()
+                },
+                if let Some(s) = dresultdt {
+                    s.as_mut_ptr()
+                } else {
+                    std::ptr::null_mut()
+                },
+                if let Some(s) = dresultdr {
+                    s.as_mut_ptr()
+                } else {
+                    std::ptr::null_mut()
+                },
+            );
+        }
+
+        if ok {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    /// Perform filtered 3D volumetric texture lookups on a batch of
+    /// positions from the same texture, all at once. The "point-like"
+    /// parameters `P`, `dPdx`, `dPdy`, and `dPdz` are each a pointers to
+    /// arrays of `float value[3][BatchWidth]` (or alternately like
+    /// `Imath::Vec3<FloatWide>`). That is, each one points to all the *x*
+    /// values for the batch, immediately followed by all the *y* values,
+    /// followed by the *z* values. The `mask` determines which of those
+    /// array elements to actually compute.
+    ///
+    /// The various results arrays are also arranged as arrays that behave
+    /// as if they were declared `float result[channels][BatchWidth]`, where
+    /// all the batch values for channel 0 are adjacent, followed by all the
+    /// batch values for channel 1, etc.
+    ///
+    /// * filename
+    ///             The name of the texture.
+    /// * options
+    ///             A TextureOptBatch containing texture lookup options.
+    ///             This is conceptually the same as a TextureOpt, but the
+    ///             following fields are arrays of `[BatchWidth]` elements:
+    ///             sblur, tblur, swidth, twidth. The other fields are, as
+    ///             with TextureOpt, ordinary scalar values.
+    /// * mask
+    ///             A bit-field designating which "lanes" should be
+    ///             computed: if `mask & (1<<i)` is nonzero, then results
+    ///             should be computed and stored for `result[...][i]`.
+    /// * P
+    ///             Pointers to the 3D texture coordinates, each as a
+    ///             `float[3][BatchWidth]`.
+    /// * dPdx/dPdy/dPdz
+    ///             The differentials of P relative to canonical directions
+    ///             x, y, and z, each as a `float[3][BatchWidth]`.
+    /// * nchannels
+    ///             The number of channels of data to retrieve into `result`
+    ///             (e.g., 1 for a single value, 3 for an RGB triple, etc.).
+    /// * result[]
+    ///             The result of the filtered texture lookup will be placed
+    ///             here, as `float [nchannels][BatchWidth]`. (Note the
+    ///             "SOA" data layout.)
+    /// * dresultds/dresultdt/dresultdr
+    ///             If non-null, these designate storage locations for the
+    ///             derivatives of result, and like `result` are in SOA
+    ///             layout: `float [nchannels][BatchWidth]`
+    ///
+    /// # Errors
+    /// * [`Error::Oiio`] - if the file was not found or could not be read
+    ///
+    /// # Panics
+    /// * If the sizes of `result`, `dresultds` and `dresultdt` do not match
+    /// * If the length of `result` is not representable as an i32
+    ///
+    pub fn texture3d_batch_with_handle<V: Vec3<f32>>(
+        &mut self,
+        handle: &TextureHandle,
+        per_thread_info: Option<&Perthread>,
+        options: &mut TextureOptBatch,
+        mask: u64,
+        p: &[V],
+        dpdx: &[V],
+        dpdy: &[V],
+        dpdz: &[V],
+        result: &mut [f32],
+        dresultds: Option<&mut [f32]>,
+        dresultdt: Option<&mut [f32]>,
+        dresultdr: Option<&mut [f32]>,
+    ) -> Result<()> {
+        let mut ok = false;
+
+        let num_channels = result.len() / BATCH_WIDTH;
+
+        if p.len() != BATCH_WIDTH
+            || dpdx.len() != BATCH_WIDTH
+            || dpdy.len() != BATCH_WIDTH
+            || dpdz.len() != BATCH_WIDTH
+        {
+            panic!("input coordinates or their derivatives are not BATCH_WIDTH in length");
+        }
+
+        if let Some(ref dresultds) = dresultds {
+            if result.len() != dresultds.len() {
+                panic!("dresultds length  != result length");
+            }
+        }
+
+        if let Some(ref dresultdt) = dresultdt {
+            if result.len() != dresultdt.len() {
+                panic!("dresultdt length  != result length");
+            }
+        }
+
+        if let Some(ref dresultdr) = dresultdr {
+            if result.len() != dresultdr.len() {
+                panic!("dresultdt length  != result length");
+            }
+        }
+
+        unsafe {
+            sys::OIIO_TextureSystem_texture3d_batch_with_handle(
+                self.0,
+                &mut ok,
+                handle.ptr,
+                if let Some(p) = per_thread_info {
+                    p.0
+                } else {
+                    std::ptr::null_mut()
+                },
+                options,
+                mask,
+                p.as_ptr() as *const f32,
+                dpdx.as_ptr() as *const f32,
+                dpdy.as_ptr() as *const f32,
+                dpdz.as_ptr() as *const f32,
+                num_channels
+                    .try_into()
+                    .expect("num channels is not representable as i32"),
+                result.as_mut_ptr(),
+                if let Some(s) = dresultds {
+                    s.as_mut_ptr()
+                } else {
+                    std::ptr::null_mut()
+                },
+                if let Some(s) = dresultdt {
+                    s.as_mut_ptr()
+                } else {
+                    std::ptr::null_mut()
+                },
+                if let Some(s) = dresultdr {
+                    s.as_mut_ptr()
+                } else {
+                    std::ptr::null_mut()
+                },
+            );
+        }
+
+        if ok {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    /// Batched shadow lookups
+    ///
+    /// # Errors
+    /// * [`Error::Oiio`] - if the file was not found or could not be read
+    ///
+    /// # Panics
+    /// * If the sizes of `result`, `dresultds` and `dresultdt` do not match
+    /// * If the length of `result` is not representable as an i32
+    ///
+    pub fn shadow_batch<V: Vec3<f32>>(
+        &mut self,
+        filename: UString,
+        options: &mut TextureOptBatch,
+        mask: u64,
+        p: &[V],
+        dpdx: &[V],
+        dpdy: &[V],
+        result: &mut [f32],
+        dresultds: Option<&mut [f32]>,
+        dresultdt: Option<&mut [f32]>,
+    ) -> Result<()> {
+        let mut ok = false;
+
+        if p.len() != BATCH_WIDTH
+            || result.len() != BATCH_WIDTH
+            || dpdx.len() != BATCH_WIDTH
+            || dpdy.len() != BATCH_WIDTH
+        {
+            panic!("input coordinates or their derivatives, or the result slice are not BATCH_WIDTH in length");
+        }
+
+        if let Some(ref dresultds) = dresultds {
+            if result.len() != dresultds.len() {
+                panic!("dresultds length  != result length");
+            }
+        }
+
+        if let Some(ref dresultdt) = dresultdt {
+            if result.len() != dresultdt.len() {
+                panic!("dresultdt length  != result length");
+            }
+        }
+
+        unsafe {
+            sys::OIIO_TextureSystem_shadow_batch(
+                self.0,
+                &mut ok,
+                filename.0,
+                options,
+                mask,
+                p.as_ptr() as *const f32,
+                dpdx.as_ptr() as *const f32,
+                dpdy.as_ptr() as *const f32,
+                result.as_mut_ptr(),
+                if let Some(s) = dresultds {
+                    s.as_mut_ptr()
+                } else {
+                    std::ptr::null_mut()
+                },
+                if let Some(s) = dresultdt {
+                    s.as_mut_ptr()
+                } else {
+                    std::ptr::null_mut()
+                },
+            );
+        }
+
+        if ok {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    /// Batched shadow lookups
+    ///
+    /// # Errors
+    /// * [`Error::Oiio`] - if the file was not found or could not be read
+    ///
+    /// # Panics
+    /// * If the sizes of `result`, `dresultds` and `dresultdt` do not match
+    /// * If the length of `result` is not representable as an i32
+    ///
+    pub fn shadow_batch_with_handle<V: Vec3<f32>>(
+        &mut self,
+        handle: &TextureHandle,
+        per_thread_info: Option<&Perthread>,
+        options: &mut TextureOptBatch,
+        mask: u64,
+        p: &[V],
+        dpdx: &[V],
+        dpdy: &[V],
+        result: &mut [f32],
+        dresultds: Option<&mut [f32]>,
+        dresultdt: Option<&mut [f32]>,
+    ) -> Result<()> {
+        let mut ok = false;
+
+        if p.len() != BATCH_WIDTH
+            || result.len() != BATCH_WIDTH
+            || dpdx.len() != BATCH_WIDTH
+            || dpdy.len() != BATCH_WIDTH
+        {
+            panic!("input coordinates or their derivatives, or the result slice are not BATCH_WIDTH in length");
+        }
+
+        if let Some(ref dresultds) = dresultds {
+            if result.len() != dresultds.len() {
+                panic!("dresultds length  != result length");
+            }
+        }
+
+        if let Some(ref dresultdt) = dresultdt {
+            if result.len() != dresultdt.len() {
+                panic!("dresultdt length  != result length");
+            }
+        }
+
+        unsafe {
+            sys::OIIO_TextureSystem_shadow_batch_with_handle(
+                self.0,
+                &mut ok,
+                handle.ptr,
+                if let Some(p) = per_thread_info {
+                    p.0
+                } else {
+                    std::ptr::null_mut()
+                },
+                options,
+                mask,
+                p.as_ptr() as *const f32,
+                dpdx.as_ptr() as *const f32,
+                dpdy.as_ptr() as *const f32,
+                result.as_mut_ptr(),
+                if let Some(s) = dresultds {
+                    s.as_mut_ptr()
+                } else {
+                    std::ptr::null_mut()
+                },
+                if let Some(s) = dresultdt {
+                    s.as_mut_ptr()
+                } else {
+                    std::ptr::null_mut()
+                },
+            );
+        }
+
+        if ok {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    /// Perform a filtered directional environment map lookup in the
+    /// direction of vector `R`, from the texture identified by `filename`,
+    /// and using relevant texture `options`.  The filtered results will be
+    /// stored in `result[]`.
+    ///
+    /// * filename
+    ///             The name of the texture.
+    /// * options
+    ///     Fields within `options` that are honored for environment lookups
+    ///     include the following:
+    ///     - `int firstchannel` :
+    ///             The index of the first channel to look up from the texture.
+    ///     - `int subimage / ustring subimagename` :
+    ///             The subimage or face within the file, specified by
+    ///             either by name (if non-empty) or index. This will be
+    ///             ignored if the file does not have multiple subimages or
+    ///             separate per-face textures.
+    ///     - `float swidth, twidth` :
+    ///             For each direction, gives a multiplier for the
+    ///             derivatives.
+    ///     - `float sblur, tblur` :
+    ///             For each direction, specifies an additional amount of
+    ///             pre-blur to apply to the texture (*after* derivatives
+    ///             are taken into account), expressed as a portion of the
+    ///             width of the texture.
+    ///     - `float fill` :
+    ///             Specifies the value that will be used for any color
+    ///             channels that are requested but not found in the file.
+    ///             For example, if you perform a 4-channel lookup on a
+    ///             3-channel texture, the last channel will get the fill
+    ///             value.  (Note: this behavior is affected by the
+    ///             `"gray_to_rgb"` TextureSystem attribute.
+    ///     - `const float *missingcolor` :
+    ///             If not `nullptr`, specifies the color that will be
+    ///             returned for missing or broken textures (rather than
+    ///             being an error).
+    /// * R
+    ///             The direction vector to look up.
+    /// * dRdx/dRdy
+    ///             The differentials of `R` with respect to image
+    ///             coordinates x and y.
+    /// * nchannels
+    ///             The number of channels of data to retrieve into `result`
+    ///             (e.g., 1 for a single value, 3 for an RGB triple, etc.).
+    /// * result[]
+    ///             The result of the filtered texture lookup will be placed
+    ///             into `result[0..nchannels-1]`.
+    /// * dresultds/dresultdt
+    ///             If non-null, these designate storage locations for the
+    ///             derivatives of result, i.e., the rate of change per unit
+    ///             s and t, respectively, of the filtered texture. If
+    ///             supplied, they must allow for `nchannels` of storage.
+    ///
+    /// # Errors
+    /// * [`Error::Oiio`] - if the file was not found or could not be read
+    ///
+    /// # Panics
+    /// * If the sizes of `result`, `dresultds` and `dresultdt` do not match
+    /// * If the length of `result` is not representable as an i32
+    ///
+    pub fn environment_batch<V: Vec3<f32>>(
+        &mut self,
+        filename: UString,
+        options: &mut TextureOptBatch,
+        mask: u64,
+        r: &[V],
+        drdx: &[V],
+        drdy: &[V],
+        result: &mut [f32],
+        dresultds: Option<&mut [f32]>,
+        dresultdt: Option<&mut [f32]>,
+    ) -> Result<()> {
+        let mut ok = false;
+
+        let num_channels = result.len() / BATCH_WIDTH;
+
+        if r.len() != BATCH_WIDTH
+            || drdx.len() != BATCH_WIDTH
+            || drdy.len() != BATCH_WIDTH
+        {
+            panic!("input coordinates or their derivatives, or the result slice are not BATCH_WIDTH in length");
+        }
+
+        if let Some(ref dresultds) = dresultds {
+            if result.len() != dresultds.len() {
+                panic!("dresultds length  != result length");
+            }
+        }
+
+        if let Some(ref dresultdt) = dresultdt {
+            if result.len() != dresultdt.len() {
+                panic!("dresultdt length  != result length");
+            }
+        }
+
+        unsafe {
+            sys::OIIO_TextureSystem_environment_batch(
+                self.0,
+                &mut ok,
+                filename.0,
+                options,
+                mask,
+                r.as_ptr() as *const f32,
+                drdx.as_ptr() as *const f32,
+                drdy.as_ptr() as *const f32,
+                num_channels
+                    .try_into()
+                    .expect("num_channels is not representable as i32"),
+                result.as_mut_ptr(),
+                if let Some(s) = dresultds {
+                    s.as_mut_ptr()
+                } else {
+                    std::ptr::null_mut()
+                },
+                if let Some(s) = dresultdt {
+                    s.as_mut_ptr()
+                } else {
+                    std::ptr::null_mut()
+                },
+            );
+        }
+
+        if ok {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    /// Perform a filtered directional environment map lookup in the
+    /// direction of vector `R`, from the texture identified by `filename`,
+    /// and using relevant texture `options`.  The filtered results will be
+    /// stored in `result[]`.
+    ///
+    /// * filename
+    ///             The name of the texture.
+    /// * options
+    ///     Fields within `options` that are honored for environment lookups
+    ///     include the following:
+    ///     - `int firstchannel` :
+    ///             The index of the first channel to look up from the texture.
+    ///     - `int subimage / ustring subimagename` :
+    ///             The subimage or face within the file, specified by
+    ///             either by name (if non-empty) or index. This will be
+    ///             ignored if the file does not have multiple subimages or
+    ///             separate per-face textures.
+    ///     - `float swidth, twidth` :
+    ///             For each direction, gives a multiplier for the
+    ///             derivatives.
+    ///     - `float sblur, tblur` :
+    ///             For each direction, specifies an additional amount of
+    ///             pre-blur to apply to the texture (*after* derivatives
+    ///             are taken into account), expressed as a portion of the
+    ///             width of the texture.
+    ///     - `float fill` :
+    ///             Specifies the value that will be used for any color
+    ///             channels that are requested but not found in the file.
+    ///             For example, if you perform a 4-channel lookup on a
+    ///             3-channel texture, the last channel will get the fill
+    ///             value.  (Note: this behavior is affected by the
+    ///             `"gray_to_rgb"` TextureSystem attribute.
+    ///     - `const float *missingcolor` :
+    ///             If not `nullptr`, specifies the color that will be
+    ///             returned for missing or broken textures (rather than
+    ///             being an error).
+    /// * R
+    ///             The direction vector to look up.
+    /// * dRdx/dRdy
+    ///             The differentials of `R` with respect to image
+    ///             coordinates x and y.
+    /// * nchannels
+    ///             The number of channels of data to retrieve into `result`
+    ///             (e.g., 1 for a single value, 3 for an RGB triple, etc.).
+    /// * result[]
+    ///             The result of the filtered texture lookup will be placed
+    ///             into `result[0..nchannels-1]`.
+    /// * dresultds/dresultdt
+    ///             If non-null, these designate storage locations for the
+    ///             derivatives of result, i.e., the rate of change per unit
+    ///             s and t, respectively, of the filtered texture. If
+    ///             supplied, they must allow for `nchannels` of storage.
+    ///
+    /// # Errors
+    /// * [`Error::Oiio`] - if the file was not found or could not be read
+    ///
+    /// # Panics
+    /// * If the sizes of `result`, `dresultds` and `dresultdt` do not match
+    /// * If the length of `result` is not representable as an i32
+    ///
+    pub fn environment_batch_with_handle<V: Vec3<f32>>(
+        &mut self,
+        handle: &TextureHandle,
+        per_thread_info: Option<&Perthread>,
+        options: &mut TextureOptBatch,
+        mask: u64,
+        r: &[V],
+        drdx: &[V],
+        drdy: &[V],
+        result: &mut [f32],
+        dresultds: Option<&mut [f32]>,
+        dresultdt: Option<&mut [f32]>,
+    ) -> Result<()> {
+        let mut ok = false;
+
+        let num_channels = result.len() / BATCH_WIDTH;
+
+        if r.len() != BATCH_WIDTH
+            || drdx.len() != BATCH_WIDTH
+            || drdy.len() != BATCH_WIDTH
+        {
+            panic!("input coordinates or their derivatives, or the result slice are not BATCH_WIDTH in length");
+        }
+
+        if let Some(ref dresultds) = dresultds {
+            if result.len() != dresultds.len() {
+                panic!("dresultds length  != result length");
+            }
+        }
+
+        if let Some(ref dresultdt) = dresultdt {
+            if result.len() != dresultdt.len() {
+                panic!("dresultdt length  != result length");
+            }
+        }
+
+        unsafe {
+            sys::OIIO_TextureSystem_environment_batch_with_handle(
+                self.0,
+                &mut ok,
+                handle.ptr,
+                if let Some(p) = per_thread_info {
+                    p.0
+                } else {
+                    std::ptr::null_mut()
+                },
+                options,
+                mask,
+                r.as_ptr() as *const f32,
+                drdx.as_ptr() as *const f32,
+                drdy.as_ptr() as *const f32,
+                num_channels
+                    .try_into()
+                    .expect("num_channels is not representable as i32"),
+                result.as_mut_ptr(),
+                if let Some(s) = dresultds {
+                    s.as_mut_ptr()
+                } else {
+                    std::ptr::null_mut()
+                },
+                if let Some(s) = dresultdt {
+                    s.as_mut_ptr()
+                } else {
+                    std::ptr::null_mut()
+                },
+            );
+        }
+
+        if ok {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+}
+
+impl TextureSystem {
+    //! Texture metadata and raw texels
+
+    /// Given possibly-relative 'filename', resolve it using the search
+    /// path rules and return the full resolved filename.
+    ///
+    pub fn resolve_filename<P: AsRef<Path>>(&self, filename: P) -> String {
+        let c_filename = CppString::new(
+            filename
+                .as_ref()
+                .to_str()
+                .expect("Could not convert filename path to string"),
+        );
+        let mut result = std::ptr::null_mut();
+        unsafe {
+            sys::OIIO_TextureSystem_resolve_filename(
+                self.0,
+                &mut result,
+                c_filename.0,
+            );
+        }
+        let result = CppString(result);
+        result.as_str().to_string()
+    }
+
+    /// Get information or metadata about the named image and store it in
+    /// `*data`.
+    ///
+    /// Data names may include any of the following:
+    ///
+    /// - `"exists"` : Stores the value 1 (as an `int`) if the file exists and
+    ///   is an image format that OpenImageIO can read, or 0 if the file
+    ///   does not exist, or could not be properly read as an image. Note
+    ///   that unlike all other queries, this query will "succeed" (return
+    ///   `true`) even if the file does not exist.
+    ///
+    /// - `"udim"` : Stores the value 1 (as an `int`) if the file is a
+    ///   "virtual UDIM" or texture atlas file (as described in
+    ///   :ref:`sec-texturesys-udim`) or 0 otherwise.
+    ///
+    /// - `"subimages"` : The number of subimages in the file, as an `int`.
+    ///
+    /// - `"resolution"` : The resolution of the image file, which is an
+    ///   array of 2 integers (described as `TypeDesc(INT,2)`).
+    ///
+    /// - `"miplevels"` : The number of MIPmap levels for the specified
+    ///   subimage (an integer).
+    ///
+    /// - `"texturetype"` : A string describing the type of texture of the
+    ///   given file, which describes how the texture may be used (also
+    ///   which texture API call is probably the right one for it). This
+    ///   currently may return one of: `"unknown"`, `"Plain Texture"`,
+    ///   `"Volume Texture"`, `"Shadow"`, or `"Environment"`.
+    ///
+    /// - `"textureformat"` : A string describing the format of the given
+    ///   file, which describes the kind of texture stored in the file. This
+    ///   currently may return one of: `"unknown"`, `"Plain Texture"`,
+    ///   `"Volume Texture"`, `"Shadow"`, `"CubeFace Shadow"`,
+    ///   `"Volume Shadow"`, `"LatLong Environment"`, or
+    ///   `"CubeFace Environment"`. Note that there are several kinds of
+    ///   shadows and environment maps, all accessible through the same API
+    ///   calls.
+    ///
+    /// - `"channels"` : The number of color channels in the file (an
+    ///   `int`).
+    ///
+    /// - `"format"` : The native data format of the pixels in the file (an
+    ///   integer, giving the `TypeDesc::BASETYPE` of the data). Note that
+    ///   this is not necessarily the same as the data format stored in the
+    ///   image cache.
+    ///
+    /// - `"cachedformat"` : The native data format of the pixels as stored
+    ///   in the image cache (an integer, giving the `TypeDesc::BASETYPE` of
+    ///   the data).  Note that this is not necessarily the same as the
+    ///   native data format of the file.
+    ///
+    /// - `"datawindow"` : Returns the pixel data window of the image, which
+    ///   is either an array of 4 integers (returning xmin, ymin, xmax,
+    ///   ymax) or an array of 6 integers (returning xmin, ymin, zmin, xmax,
+    ///   ymax, zmax). The z values may be useful for 3D/volumetric images;
+    ///   for 2D images they will be 0).
+    ///
+    /// - `"displaywindow"` : Returns the display (a.k.a. "full") window of
+    ///   the image, which is either an array of 4 integers (returning xmin,
+    ///   ymin, xmax, ymax) or an array of 6 integers (returning xmin, ymin,
+    ///   zmin, xmax, ymax, zmax). The z values may be useful for
+    ///   3D/volumetric images; for 2D images they will be 0).
+    ///
+    /// - `"worldtocamera"` : The viewing matrix, which is a 4x4 matrix (an
+    ///   `Imath::M44f`, described as `TypeDesc(FLOAT,MATRIX)`), giving the
+    ///   world-to-camera 3D transformation matrix that was used when  the
+    ///   image was created. Generally, only rendered images will have this.
+    ///
+    /// - `"worldtoscreen"` : The projection matrix, which is a 4x4 matrix
+    ///   (an `Imath::M44f`, described as `TypeDesc(FLOAT,MATRIX)`), giving
+    ///   the matrix that projected points from world space into a 2D screen
+    ///   coordinate system where $x$ and $y$ range from -1 to +1.
+    ///   Generally, only rendered images will have this.
+    ///
+    /// - `"worldtoNDC"` : The projection matrix, which is a 4x4 matrix
+    ///   (an `Imath::M44f`, described as `TypeDesc(FLOAT,MATRIX)`), giving
+    ///   the matrix that projected points from world space into a 2D NDC
+    ///   coordinate system where $x$ and $y$ range from 0 to +1. Generally,
+    ///   only rendered images will have this.
+    ///
+    /// - `"averagecolor"` : If available in the metadata (generally only
+    ///   for files that have been processed by `maketx`), this will return
+    ///   the average color of the texture (into an array of `float`).
+    ///
+    /// - `"averagealpha"` : If available in the metadata (generally only
+    ///   for files that have been processed by `maketx`), this will return
+    ///   the average alpha value of the texture (into a `float`).
+    ///
+    /// - `"constantcolor"` : If the metadata (generally only for files that
+    ///   have been processed by `maketx`) indicates that the texture has
+    ///   the same values for all pixels in the texture, this will retrieve
+    ///   the constant color of the texture (into an array of floats). A
+    ///   non-constant image (or one that does not have the special metadata
+    ///   tag identifying it as a constant texture) will fail this query
+    ///   (return `false`).
+    ///
+    /// - `"constantalpha"` : If the metadata indicates that the texture has
+    ///   the same values for all pixels in the texture, this will retrieve
+    ///   the constant alpha value of the texture (into a float). A
+    ///   non-constant image (or one that does not have the special metadata
+    ///   tag identifying it as a constant texture) will fail this query
+    ///   (return `false`).
+    ///
+    /// - `"stat:tilesread"` : Number of tiles read from this file
+    ///   (`int64`).
+    ///
+    /// - `"stat:bytesread"` : Number of bytes of uncompressed pixel data
+    ///   read from this file (`int64`).
+    ///
+    /// - `"stat:redundant_tiles"` : Number of times a tile was read, where
+    ///   the same tile had been rad before. (`int64`).
+    ///
+    /// - `"stat:redundant_bytesread"` : Number of bytes (of uncompressed
+    ///   pixel data) in tiles that were read redundantly. (`int64`).
+    ///
+    /// - `"stat:redundant_bytesread"` : Number of tiles read from this file (`int`).
+    ///
+    /// - `"stat:image_size"` : Size of the uncompressed image pixel data
+    /// of this image, in bytes (`int64`).
+    ///
+    /// - `"stat:file_size"` : Size of the disk file (possibly compressed)
+    ///   for this image, in bytes (`int64`).
+    ///
+    /// - `"stat:timesopened"` : Number of times this file was opened
+    ///   (`int`).
+    ///
+    /// - `"stat:iotime"` : Time (in seconds) spent on all I/O for this file
+    ///   (`float`).
+    ///
+    /// - `"stat:mipsused"` : Stores 1 if any MIP levels beyond the highest
+    ///   resolution were accessed, otherwise 0. (`int`)
+    ///
+    /// - `"stat:is_duplicate"` : Stores 1 if this file was a duplicate of
+    ///   another image, otherwise 0. (`int`)
+    ///
+    /// - *Anything else*  : For all other data names, the the metadata of
+    ///   the image file will be searched for an item that matches both the
+    ///   name and data type.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// * filename
+    ///             The name of the image.
+    /// * subimage/miplevel
+    ///             The subimage and MIP level to query.
+    /// * dataname
+    ///             The name of the metadata to retrieve.
+    /// * data
+    ///             Pointer to the caller-owned memory where the values
+    ///             should be stored. It is the caller's responsibility to
+    ///             ensure that `data` points to a large enough storage area
+    ///             to accommodate the `datatype` requested.
+    ///
+    /// # Errors
+    /// * [`Error::InvalidHandle`] - if the combination of handle, subimage and miplevel does not
+    /// refer to a valid image that can be read
+    ///
+    pub fn get_texture_info<A: AttributeMetadata>(
+        &self,
+        filename: UString,
+        subimage: i32,
+        dataname: UString,
+        data: A,
+    ) -> Result<A> {
+        let mut ok = false;
+        let mut data = data;
+        unsafe {
+            sys::OIIO_TextureSystem_get_texture_info(
+                self.0,
+                &mut ok,
+                filename.0,
+                subimage,
+                dataname.0,
+                A::TYPE.into(),
+                &mut data as *mut A as *mut c_void,
+            );
+        }
+        if ok {
+            Ok(data)
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    /// A more efficient variety of [`get_texture_info()`](ImageCache::get_image_info) for cases where you
+    /// can use a [`TextureHandle`] to specify the image and optionally have a
+    /// [`Perthread`] for the calling thread.
+    ///
+    /// # Errors
+    /// * [`Error::InvalidHandle`] - if the combination of handle, subimage and miplevel does not
+    /// refer to a valid image that can be read
+    ///
+    pub fn get_texture_info_with_handle<A: AttributeMetadata>(
+        &self,
+        handle: &TextureHandle,
+        thread_info: Option<&Perthread>,
+        subimage: i32,
+        dataname: UString,
+        data: A,
+    ) -> Result<A> {
+        let mut ok = false;
+        let mut data = data;
+        unsafe {
+            sys::OIIO_TextureSystem_get_texture_info_with_handle(
+                self.0,
+                &mut ok,
+                handle.ptr,
+                if let Some(p) = thread_info {
+                    p.0
+                } else {
+                    std::ptr::null_mut()
+                },
+                subimage,
+                dataname.0,
+                A::TYPE.into(),
+                &mut data as *mut A as *mut c_void,
+            );
+        }
+        if ok {
+            Ok(data)
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    /// Return a reference to an ImageSpec associated with the given ImageHandle at the given
+    /// subimage and miplevel.
+    ///
+    /// # Safety
+    /// Although the returned Ref is tied to the lifetime of `handle`, it is
+    /// still possible for that ImageHandle to be invalidated by getting another
+    /// handle to the same file and calling invalidate on that. Therefore the
+    /// user is responsible for makng sure this doesn't happen.
+    ///
+    /// # Errors
+    /// * [`Error::InvalidHandle`] - if the combination of handle, subimage and miplevel does not
+    /// refer to a valid image that can be read
+    ///
+    pub unsafe fn imagespec<'h>(
+        &self,
+        handle: &'h TextureHandle,
+        thread_info: Option<&Perthread>,
+        subimage: i32,
+    ) -> Result<ImageSpecRef<'h>> {
+        let mut ptr = std::ptr::null();
+        sys::OIIO_TextureSystem_imagespec_with_handle(
+            self.0,
+            &mut ptr,
+            handle.ptr,
+            if let Some(p) = thread_info {
+                p.0
+            } else {
+                std::ptr::null_mut()
+            },
+            subimage,
+        );
+
+        if ptr.is_null() {
+            Err(Error::InvalidHandle)
+        } else {
+            Ok(ImageSpecRef::new(ptr))
+        }
+    }
+
+    /// Get a copy of the ImageSpec associated with the named image, subimage and miplevel.
+    ///
+    /// This method is obviously slower than [`imagespec`](ImageCache::imagespec)
+    /// as it copies the spec, but it is safe.
+    ///
+    /// # Errors
+    /// * [`Error::Oiio`] - if any error occurs
+    ///
+    pub fn imagespec_copy(
+        &self,
+        handle: &TextureHandle,
+        thread_info: Option<&Perthread>,
+        subimage: i32,
+    ) -> Result<ImageSpec> {
+        let spec = ImageSpec::from_typedesc(TypeDesc::UNKNOWN);
+        let mut result = false;
+        unsafe {
+            sys::OIIO_TextureSystem_get_imagespec_with_handle(
+                self.0,
+                &mut result,
+                handle.ptr,
+                if let Some(p) = thread_info {
+                    p.0
+                } else {
+                    std::ptr::null_mut()
+                },
+                subimage,
+                spec.0,
+            );
+        }
+
+        if result {
+            Ok(spec)
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+
+    pub unsafe fn get_texels<T: Pixel>(
+        &self,
+        handle: &TextureHandle,
+        thread_info: Option<&Perthread>,
+        options: &mut TextureOpt,
+        miplevel: usize,
+        xbegin: i32,
+        xend: i32,
+        ybegin: i32,
+        yend: i32,
+        zbegin: i32,
+        zend: i32,
+        chbegin: usize,
+        chend: usize,
+        data: &[T],
+    ) -> Result<()> {
+        let mut ok = false;
+
+        let len = ((xend - xbegin) * (yend - ybegin) * (zend - zbegin))
+            as usize
+            * (chend - chbegin);
+
+        if data.len() < len {
+            panic!("data slice is not beg enough to hold requested texels");
+        }
+
+        sys::OIIO_TextureSystem_get_texels_with_handle(
+            self.0,
+            &mut ok,
+            handle.ptr,
+            if let Some(p) = thread_info {
+                p.0
+            } else {
+                std::ptr::null_mut()
+            },
+            options,
+            miplevel
+                .try_into()
+                .expect("miplevel is not representable as i32"),
+            xbegin,
+            xend,
+            ybegin,
+            yend,
+            zbegin,
+            zend,
+            chbegin
+                .try_into()
+                .expect("chbegin is not representable as i32"),
+            chend.try_into().expect("chend is not representable as i32"),
+            T::FORMAT.into(),
+            data.as_ptr() as *mut c_void,
+        );
+
+        if ok {
+            Ok(())
+        } else {
+            Err(Error::Oiio(self.get_error(true)))
+        }
+    }
+}
+
+impl TextureSystem {
+    //! Methods for UDIM patterns
+
+    /// Is the filename a UDIM pattern?
+    ///
+    pub fn is_udim(&self, filename: UString) -> bool {
+        let mut result = false;
+        unsafe {
+            sys::OIIO_TextureSystem_is_udim(self.0, &mut result, filename.0);
+        }
+
+        result
+    }
+
+    /// Does the handle refer to a file that's a UDIM pattern?
+    ///
+    pub fn is_udim_with_handle(&self, handle: &TextureHandle) -> bool {
+        let mut result = false;
+        unsafe {
+            sys::OIIO_TextureSystem_is_udim_with_handle(
+                self.0,
+                &mut result,
+                handle.ptr,
+            );
+        }
+
+        result
+    }
+
+    /// For a UDIM filename pattern and texture coordinates, return the
+    /// TextureHandle pointer for the concrete tile file it refers to, or
+    /// nullptr if there is no corresponding tile (udim sets are allowed to
+    /// be sparse).
+    ///
+    pub fn resolve_udim(
+        &self,
+        udim_pattern: UString,
+        s: f32,
+        t: f32,
+    ) -> TextureHandle {
+        let mut ptr = std::ptr::null_mut();
+        unsafe {
+            sys::OIIO_TextureSystem_resolve_udim(
+                self.0,
+                &mut ptr,
+                udim_pattern.0,
+                s,
+                t,
+            );
+        }
+
+        TextureHandle {
+            ptr,
+            marker: PhantomData,
+        }
+    }
+
+    /// For a UDIM handle and texture coordinates, return the
+    /// TextureHandle pointer for the concrete tile file it refers to, or
+    /// nullptr if there is no corresponding tile (udim sets are allowed to
+    /// be sparse).
+    ///
+    pub fn resolve_udim_with_handle(
+        &self,
+        handle: &TextureHandle,
+        thread_info: Option<&mut Perthread>,
+        s: f32,
+        t: f32,
+    ) -> TextureHandle {
+        let mut ptr = std::ptr::null_mut();
+        unsafe {
+            sys::OIIO_TextureSystem_resolve_udim_with_handle(
+                self.0,
+                &mut ptr,
+                handle.ptr,
+                if let Some(p) = thread_info {
+                    p.0
+                } else {
+                    std::ptr::null_mut()
+                },
+                s,
+                t,
+            );
+        }
+
+        TextureHandle {
+            ptr,
+            marker: PhantomData,
+        }
+    }
+
+    /// Produce a full inventory of the set of concrete files comprising the
+    /// UDIM set specified by `udimpattern`.  The apparent number of texture
+    /// atlas tiles in the u and v directions will be written to `nutiles`
+    /// and `nvtiles`, respectively. The vector `filenames` will be sized
+    /// to `nutiles * nvtiles` and filled with the the names of the concrete
+    /// files comprising the atlas, with an empty ustring corresponding to
+    /// any unpopulated tiles (the UDIM set is allowed to be sparse). The
+    /// filename list is indexed as `utile + vtile * nvtiles`.
+    ///
+    pub fn inventory_udim(
+        &self,
+        udim_pattern: UString,
+    ) -> (Vec<UString>, usize, usize) {
+        let mut v = std::ptr::null_mut();
+        let mut nu = 0;
+        let mut nv = 0;
+
+        unsafe {
+            sys::std_vector_ustring_ctor(&mut v);
+
+            sys::OIIO_TextureSystem_inventory_udim(
+                self.0,
+                udim_pattern.0,
+                v,
+                &mut nu,
+                &mut nv,
+            );
+
+            let mut len = 0;
+            sys::std_vector_ustring_size(v, &mut len);
+            let mut data = std::ptr::null();
+            sys::std_vector_ustring_data_const(v, &mut data);
+
+            let vec: Vec<UString> = std::slice::from_raw_parts(data, len)
+                .iter()
+                .map(|u| UString(*u))
+                .collect();
+
+            (vec, nu as usize, nv as usize)
+        }
+    }
+}
+
+
+impl TextureSystem {
+    //! Controlling the cache
+    /// Invalidate any cached information about the named file, including
+    /// loaded texture tiles from that texture, and close any open file
+    /// handle associated with the file. This calls
+    /// `ImageCache::invalidate(filename,force)` on the underlying
+    /// ImageCache.
+    ///
+    pub fn invalidate(&self, filename: UString, force: bool) {
+        unsafe {
+            sys::OIIO_TextureSystem_invalidate(
+                self.0, filename.0, force,
+            );
+        }
+    }
+
+    /// Invalidate all loaded tiles and close open file handles.  This is
+    /// safe to do even if other procedures are currently holding
+    /// reference-counted tile pointers from the named image, but those
+    /// procedures will not get updated pixels (if the images change) until
+    /// they release the tiles they are holding.
+    ///
+    /// If `force` is true, everything will be invalidated, no matter how
+    /// wasteful it is, but if `force` is false, in actuality files will
+    /// only be invalidated if their modification times have been changed
+    /// since they were first opened.
+    ///
+    pub fn invalidate_all(&mut self, force: bool) {
+        unsafe {
+            sys::OIIO_TextureSystem_invalidate_all(self.0, force);
+        }
+    }
+
+    /// Close any open file handles associated with a named file, but do not
+    /// invalidate any image spec information or pixels associated with the
+    /// files.  A client might do this in order to release OS file handle
+    /// resources, or to make it safe for other processes to modify textures
+    /// on disk.  This calls `ImageCache::close(force)` on the underlying
+    /// ImageCache.
+    ///
+    pub fn close(&mut self, filename: UString) {
+        unsafe {
+            sys::OIIO_TextureSystem_close(
+                self.0, filename.0, 
+            );
+        }
+    }
+
+    /// `close()` all files known to the cache.
+    ///
+    pub fn close_all(&mut self) {
+        unsafe {
+            sys::OIIO_TextureSystem_close_all(
+                self.0,
+            );
+        }
+    }
+
 }
 
 impl TextureSystem {

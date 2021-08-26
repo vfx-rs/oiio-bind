@@ -379,7 +379,7 @@ struct TextureSystem {
                           OIIO::TextureSystem::Perthread* thread_info,
                           int subimage, OIIO::ustring dataname,
                           OIIO::TypeDesc datatype, void* data)
-        CPPMM_RENAME(get_texture_info_from_handle);
+        CPPMM_RENAME(get_texture_info_with_handle);
 
     auto get_imagespec(OIIO::ustring filename, int subimage,
                        OIIO::ImageSpec& spec) -> bool;
@@ -387,14 +387,14 @@ struct TextureSystem {
     bool get_imagespec(OIIO::TextureSystem::TextureHandle* texture_handle,
                        OIIO::TextureSystem::Perthread* thread_info,
                        int subimage, OIIO::ImageSpec& spec)
-        CPPMM_RENAME(get_imagespec_from_handle);
+        CPPMM_RENAME(get_imagespec_with_handle);
 
     const OIIO::ImageSpec* imagespec(OIIO::ustring filename, int subimage);
 
     const OIIO::ImageSpec*
     imagespec(OIIO::TextureSystem::TextureHandle* texture_handle,
               OIIO::TextureSystem::Perthread* thread_info, int subimage)
-        CPPMM_RENAME(imagespace_from_handle);
+        CPPMM_RENAME(imagespec_with_handle);
 
     auto get_texels(OIIO::ustring filename, OIIO::TextureOpt& options,
                     int miplevel, int xbegin, int xend, int ybegin, int yend,
@@ -406,7 +406,7 @@ struct TextureSystem {
                     OIIO::TextureOpt& options, int miplevel, int xbegin,
                     int xend, int ybegin, int yend, int zbegin, int zend,
                     int chbegin, int chend, OIIO::TypeDesc format, void* result)
-        CPPMM_RENAME(get_texels_from_handle);
+        CPPMM_RENAME(get_texels_with_handle);
 
     auto invalidate(OIIO::ustring filename, bool force) -> void;
     auto invalidate_all(bool force) -> void;

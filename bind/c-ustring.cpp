@@ -240,7 +240,8 @@ struct ustring {
     static size_t hash_collisions(std::vector<OIIO::ustring>* collisions);
 
 } CPPMM_OPAQUEBYTES CPPMM_TRIVIALLY_MOVABLE
-    CPPMM_TRIVIALLY_COPYABLE; // struct ustring
+    CPPMM_TRIVIALLY_COPYABLE 
+    CPPMM_DERIVE("Copy, Clone, PartialEq, Eq, PartialOrd, Ord"); // struct ustring
 
 CPPMM_IGNORE
 auto iequals(OIIO::ustring a, OIIO::ustring b) -> bool;

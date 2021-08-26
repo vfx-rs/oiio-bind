@@ -1,4 +1,3 @@
-use crate::error::Error;
 use oiio_sys as sys;
 
 #[repr(u8)]
