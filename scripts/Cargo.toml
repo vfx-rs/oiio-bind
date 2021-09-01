@@ -41,7 +41,7 @@ exclude = [
 ]
 
 [dependencies]
-openexr-sys = {path="../../../openexr-sys"}
+openexr-sys = "^0.10"
 
 [build-dependencies]
 cppmm-build = {path = "../../../cppmm-build"}
