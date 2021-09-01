@@ -9,8 +9,8 @@ fn main() {
             Dependency {
                 name: "oiio",
                 definitions: vec![
-                    ("BUILD_TOOLS", "OFF"),
-                    ("BUILD_TESTS", "OFF"),
+                    ("OIIO_BUILD_TOOLS", "OFF"),
+                    ("OIIO_BUILD_TESTS", "OFF"),
                     ("BUILD_DOCS", "OFF"),
                     ("USE_PYTHON", "OFF"),
                 ],
