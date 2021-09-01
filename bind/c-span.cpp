@@ -79,6 +79,9 @@ using cspan_uint = OIIO::span<const unsigned int>;
 template class span<const int>;
 using cspan_int = OIIO::span<const int>;
 
+template class span<int>;
+using span_int = OIIO::span<int>;
+
 template class span<const char>;
 using cspan_char = OIIO::span<const char>;
 
@@ -161,6 +164,9 @@ extern template OIIO::span<float>::span(float* data, OIIO::oiio_span_size_type s
 
 OIIO::span<const int> dummy3;
 extern template OIIO::span<const int>::span(const int* data, OIIO::oiio_span_size_type size);
+
+OIIO::span<int> dummy3a;
+extern template OIIO::span<int>::span(int* data, OIIO::oiio_span_size_type size);
 
 OIIO::span<const unsigned int> dummy4;
 extern template OIIO::span<const unsigned int>::span(const unsigned int* data,

@@ -203,11 +203,9 @@ impl TextureSystem {
     //!             `name=value` settings of named options, which will be
     //!             parsed and individually set.
     //!
-    //!                 ic->attribute ("options", "max_memory_MB=512.0,autotile=1");
-    //!
-    //!             Note that if an option takes a string value that must
-    //!             itself contain a comma, it is permissible to enclose the
-    //!             value in either single `\'` or double `"` quotes.
+    //! Note that if an option takes a string value that must
+    //! itself contain a comma, it is permissible to enclose the
+    //! value in either single or double quotes.
     //!
 
     /// Gets attribute `name`

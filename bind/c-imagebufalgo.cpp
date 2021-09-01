@@ -129,14 +129,14 @@ enum class TextAlignX {
     Left = 0,
     Right = 1,
     Center = 2,
-};
+} CPPMM_RUSTIFY_ENUM;
 
 enum class TextAlignY {
     Baseline = 0,
     Top = 1,
     Bottom = 2,
     Center = 3,
-};
+} CPPMM_RUSTIFY_ENUM;
 
 auto render_text(OIIO::ImageBuf& dst, int x, int y, OIIO::string_view text,
                  int fontsize, OIIO::string_view fontname,
@@ -152,14 +152,14 @@ auto channels(
     const OIIO::ImageBuf& src, int nchannels,
     OIIO::span<const int, -1> channelorder,
     OIIO::span<const float, -1> channelvalues,
-    OIIO::span<const std::__cxx11::basic_string<char>, -1> newchannelnames,
+    OIIO::span<const std::string, -1> newchannelnames,
     bool shuffle_channel_names, int nthreads) -> OIIO::ImageBuf;
 
 bool channels(
     OIIO::ImageBuf& dst, const OIIO::ImageBuf& src, int nchannels,
     OIIO::span<const int, -1> channelorder,
     OIIO::span<const float, -1> channelvalues,
-    OIIO::span<const std::__cxx11::basic_string<char>, -1> newchannelnames,
+    OIIO::span<const std::string, -1> newchannelnames,
     bool shuffle_channel_names, int nthreads) CPPMM_RENAME(channels_in);
 
 auto channel_append(const OIIO::ImageBuf& A, const OIIO::ImageBuf& B,

@@ -41,8 +41,7 @@ exclude = [
 ]
 
 [dependencies]
-openexr-sys = {path="../../../openexr-bind-vfxrs/openexr-sys"}
+openexr-sys = {path="../../../openexr-sys"}
 
 [build-dependencies]
-cmake = "0.1"
-regex = "1.5.4"
+cppmm-build = {path = "../../../cppmm-build"}

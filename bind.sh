@@ -37,7 +37,7 @@ cp -r thirdparty/oiio build/${project_name}-sys/thirdparty/
 
 pushd build/${project_name}-sys/thirdparty/oiio
 # we need to pull down the dependencies now so we can build offline
-export OIIO_DEP_DOWNLOAD_ONLY=1
+export DEP_DOWNLOAD_ONLY=1
 
 src/build-scripts/build_gif.bash
 src/build-scripts/build_libjpeg-turbo.bash
@@ -50,7 +50,7 @@ src/build-scripts/build_pybind11.bash
 src/build-scripts/build_webp.bash
 src/build-scripts/build_zlib.bash
 
-unset OIIO_DEP_DOWNLOAD_ONLY
+unset DEP_DOWNLOAD_ONLY
 
 # Do a cmake configure to get cmake to pull down robinmap etc. Additional
 # libraries will be built by the build scripts from build.rs

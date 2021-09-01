@@ -15,7 +15,7 @@ features = ["full-docs"]
 
 [dependencies]
 oiio-sys = {path="../build/oiio-sys"}
-openexr = {path="../../openexr-bind-vfxrs/openexr-rs"}
+openexr = {path="../../openexr-rs"}
 thiserror = "^1.0"
 half = "^1.7"
 imath-traits = "^0.4"

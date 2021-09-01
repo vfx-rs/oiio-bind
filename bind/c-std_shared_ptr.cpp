@@ -23,7 +23,7 @@ public:
 
     shared_ptr(const std::shared_ptr<T>& rhs);
 
-    T* get();
+    T* get() const;
 
     ~shared_ptr() CPPMM_RENAME(dtor);
 
