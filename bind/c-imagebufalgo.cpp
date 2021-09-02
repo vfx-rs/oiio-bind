@@ -61,7 +61,7 @@ struct Image_or_Const {
 
     } CPPMM_OPAQUEBYTES; // struct None
 
-} CPPMM_OPAQUEPTR; // struct Image_or_Const
+} CPPMM_OPAQUEBYTES; // struct Image_or_Const
 
 namespace ImageBufAlgo {
 
@@ -307,6 +307,11 @@ auto resample(OIIO::ImageBuf& dst, const OIIO::ImageBuf& src, bool interpolate,
               OIIO::ROI roi, int nthreads) -> bool;
 
 auto fit(const OIIO::ImageBuf& src, OIIO::string_view filtername,
+         float filterwidth, OIIO::string_view fill_mode, bool exact, OIIO::ROI roi, int nthreads)
+    -> OIIO::ImageBuf;
+
+CPPMM_IGNORE
+auto fit(const OIIO::ImageBuf& src, OIIO::string_view filtername,
          float filterwidth, bool exact, OIIO::ROI roi, int nthreads)
     -> OIIO::ImageBuf;
 
@@ -314,10 +319,14 @@ CPPMM_RENAME(fit_with_filter)
 auto fit(const OIIO::ImageBuf& src, OIIO::Filter2D* filter, bool exact,
          OIIO::ROI roi, int nthreads) -> OIIO::ImageBuf;
 
-CPPMM_RENAME(fit_in)
+CPPMM_IGNORE
 auto fit(OIIO::ImageBuf& dst, const OIIO::ImageBuf& src,
          OIIO::string_view filtername, float filterwidth, bool exact,
          OIIO::ROI roi, int nthreads) -> bool;
+
+CPPMM_RENAME(fit_in)
+auto fit(OIIO::ImageBuf& dst, const OIIO::ImageBuf& src,
+         OIIO::string_view filtername, float filterwidth, OIIO::string_view fill_mode, bool exact, OIIO::ROI roi, int nthreads) -> bool;
 
 CPPMM_RENAME(fit_with_filter_in)
 auto fit(OIIO::ImageBuf& dst, const OIIO::ImageBuf& src, OIIO::Filter2D* filter,
