@@ -57,11 +57,17 @@ using vector_uchar = ::std::vector<unsigned char>;
 template class vector<float>;
 using vector_float = ::std::vector<float>;
 
-template class vector<unsigned long>;
-using vector_ulong = ::std::vector<unsigned long>;
+template class vector<double>;
+using vector_double = ::std::vector<double>;
+
+/* template class vector<unsigned long>; */
+/* using vector_ulong = ::std::vector<unsigned long>; */
 
 template class vector<int>;
 using vector_int = ::std::vector<int>;
+
+template class vector<size_t>;
+using vector_size_t = ::std::vector<size_t>;
 
 // can't do this yet
 // template class vector<void*>;
@@ -80,7 +86,9 @@ template class std::vector<OIIO::ustring>;
 template class std::vector<char>;
 template class std::vector<unsigned char>;
 template class std::vector<float>;
-template class std::vector<unsigned long>;
+template class std::vector<double>;
+/* template class std::vector<unsigned long>; */
 template class std::vector<int>;
+template class std::vector<size_t>;
 // template class std::vector<void*>;
 template class std::vector<OIIO::TypeDesc>;

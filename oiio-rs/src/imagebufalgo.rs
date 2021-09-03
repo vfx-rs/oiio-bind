@@ -1,4 +1,4 @@
-use crate::cppstd::CppString;
+use crate::cppstd::{CppString, CppVectorSize};
 use crate::error::{get_error, Error};
 use crate::filesystem::IOProxy;
 use crate::imagebuf::{ImageBuf, WrapMode};
@@ -7,9 +7,10 @@ use crate::imageio::{
     get_trampoline, ImageOutputOpened, ImageSpec, ImageSpecRef, Roi, Stride,
     Strides,
 };
-use crate::span::{SpanF32, SpanI32, SpanString};
+use crate::span::{SpanF32, SpanF32Mut, SpanI32, SpanString};
 use crate::typedesc::TypeDesc;
 
+use crate::color::{ColorConfig, ColorProcessor};
 use crate::string_view::StringView;
 use crate::traits::Pixel;
 
@@ -19,7 +20,7 @@ use std::convert::TryInto;
 use std::os::raw::c_void;
 use std::path::Path;
 
-use imath_traits::Matrix33;
+use imath_traits::{Matrix33, Matrix44};
 
 type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -2499,12 +2500,7 @@ pub fn mad_in(
 /// windows; pixel values of `A` or `B` that are outside their respective
 /// pixel data window will be treated as having "zero" (0,0,0...) value.
 ///
-pub fn over(
-    a: &ImageBuf,
-    b: &ImageBuf,
-    roi: Roi,
-    nthreads: usize,
-) -> ImageBuf {
+pub fn over(a: &ImageBuf, b: &ImageBuf, roi: Roi, nthreads: usize) -> ImageBuf {
     let mut ptr = std::ptr::null_mut();
     unsafe {
         sys::OIIO_ImageBufAlgo_over(
@@ -2972,6 +2968,8 @@ pub fn clamp(
 /// * If `clampalpha01` is true, then additionally any alpha channel is
 ///   clamped to the 0-1 range.
 ///
+/// Write to an existing image `dst` (allocating if it is uninitialized).
+///
 pub fn clamp_in(
     dst: &mut ImageBuf,
     a: &ImageBuf,
@@ -3095,6 +3093,8 @@ pub fn contrast_remap(
 /// these effects. Note that if `black` == `white`, the result will be a
 /// simple binary thresholding where values < `black` map to `min` and
 /// values >= `black` map to `max`.
+///
+/// Write to an existing image `dst` (allocating if it is uninitialized).
 ///
 pub fn contrast_remap_in(
     dst: &mut ImageBuf,
@@ -3233,4 +3233,2580 @@ pub fn color_map_named(
     }
 
     ImageBuf { ptr }
+}
+
+/// Return (or copy into `dst`) pixel values determined by looking up a
+/// color map using values of the source image, using either the channel
+/// specified by `srcchannel`, or the luminance of `src`'s RGB if
+/// `srcchannel` is None. This happens for all pixels within the  ROI (which
+/// defaults to all of `src`), and if `dst` is not already initialized, it
+/// will be initialized to the ROI and with color channels equal to
+/// `channels`.
+///
+/// In the variant that takes a `knots` parameter, this specifies the values
+/// of a linearly-interpolated color map given by `knots[nknots*channels]`.
+/// An input value of 0.0 is mapped to `knots[0..channels-1]` (one value for
+/// each color channel), and an input value of 1.0 is mapped to
+/// `knots[(nknots-1)*channels..knots.size()-1]`.
+///
+/// Write to an existing image `dst` (allocating if it is uninitialized).
+///
+///
+pub fn color_map_in(
+    dst: &mut ImageBuf,
+    a: &ImageBuf,
+    src_channel: Option<usize>,
+    num_knots: usize,
+    num_channels: usize,
+    knots: &[f32],
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_color_map_in(
+            &mut result,
+            dst.ptr,
+            a.ptr,
+            if let Some(c) = src_channel {
+                c.try_into()
+                    .expect("src_channel is not representable as i32")
+            } else {
+                -1
+            },
+            num_knots
+                .try_into()
+                .expect("num_knots is not representable as i32"),
+            num_channels
+                .try_into()
+                .expect("num_channels is not representable as i32"),
+            SpanF32::from(knots).0,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Return (or copy into `dst`) pixel values determined by looking up a
+/// color map using values of the source image, using either the channel
+/// specified by `srcchannel`, or the luminance of `src`'s RGB if
+/// `srcchannel` is None. This happens for all pixels within the  ROI (which
+/// defaults to all of `src`), and if `dst` is not already initialized, it
+/// will be initialized to the ROI and with color channels equal to
+/// `channels`.
+///
+/// In the variant that takes a `mapname` parameter, this is the name of a
+/// color map. Recognized map names include: "inferno", "viridis", "magma",
+/// "plasma", all of which are perceptually uniform, strictly increasing in
+/// luminance, look good when converted to grayscale, and work for people
+/// with all types of colorblindness. Also "turbo" has most of these
+/// properties (except for being strictly increasing in luminance) and
+/// is a nice rainbow-like pattern. Also supported are the following color
+/// maps that do not have those desirable qualities (and are thus not
+/// recommended, but are present for back-compatibility or for use by
+/// clueless people): "blue-red", "spectrum", and "heat". In all cases, the
+/// implied `channels` is 3.
+///
+/// Write to an existing image `dst` (allocating if it is uninitialized).
+///
+pub fn color_map_named_in(
+    dst: &mut ImageBuf,
+    a: &ImageBuf,
+    src_channel: Option<usize>,
+    map_name: &str,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_color_map_named_in(
+            &mut result,
+            dst.ptr,
+            a.ptr,
+            if let Some(c) = src_channel {
+                c.try_into()
+                    .expect("src_channel is not representable as i32")
+            } else {
+                -1
+            },
+            StringView::from(map_name).0,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// `rangecompress()` returns (or copy into `dst`) all pixels and color
+/// channels of `src` within region `roi` (defaulting to all the defined
+/// pixels of `dst`), rescaling their range with a logarithmic
+/// transformation. Alpha and z channels are not transformed.
+///
+/// If `useluma` is true, the luma of channels [roi.chbegin..roi.chbegin+2]
+/// (presumed to be R, G, and B) are used to compute a single scale factor
+/// for all color channels, rather than scaling all channels individually
+/// (which could result in a color shift).
+///
+/// The purpose of these function is as follows: Some image operations (such
+/// as resizing with a "good" filter that contains negative lobes) can have
+/// objectionable artifacts when applied to images with very high-contrast
+/// regions involving extra bright pixels (such as highlights in HDR
+/// captured or rendered images).  By compressing the range pixel values,
+/// then performing the operation, then expanding the range of the result
+/// again, the result can be much more pleasing (even if not exactly
+/// correct).
+///
+pub fn range_compress(
+    a: &ImageBuf,
+    use_luma: bool,
+    roi: Roi,
+    nthreads: usize,
+) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_rangecompress(
+            &mut ptr,
+            a.ptr,
+            use_luma,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// `rangecompress()` returns (or copy into `dst`) all pixels and color
+/// channels of `src` within region `roi` (defaulting to all the defined
+/// pixels of `dst`), rescaling their range with a logarithmic
+/// transformation. Alpha and z channels are not transformed.
+///
+/// If `useluma` is true, the luma of channels [roi.chbegin..roi.chbegin+2]
+/// (presumed to be R, G, and B) are used to compute a single scale factor
+/// for all color channels, rather than scaling all channels individually
+/// (which could result in a color shift).
+///
+/// The purpose of these function is as follows: Some image operations (such
+/// as resizing with a "good" filter that contains negative lobes) can have
+/// objectionable artifacts when applied to images with very high-contrast
+/// regions involving extra bright pixels (such as highlights in HDR
+/// captured or rendered images).  By compressing the range pixel values,
+/// then performing the operation, then expanding the range of the result
+/// again, the result can be much more pleasing (even if not exactly
+/// correct).
+///
+/// Write to an existing image `dst` (allocating if it is uninitialized).
+///
+pub fn range_compress_in(
+    dst: &mut ImageBuf,
+    a: &ImageBuf,
+    use_luma: bool,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_rangecompress_in(
+            &mut result,
+            dst.ptr,
+            a.ptr,
+            use_luma,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// `rangeexpand()` performs the inverse transformation (logarithmic back
+/// into linear).
+///
+/// If `useluma` is true, the luma of channels [roi.chbegin..roi.chbegin+2]
+/// (presumed to be R, G, and B) are used to compute a single scale factor
+/// for all color channels, rather than scaling all channels individually
+/// (which could result in a color shift).
+///
+/// The purpose of these function is as follows: Some image operations (such
+/// as resizing with a "good" filter that contains negative lobes) can have
+/// objectionable artifacts when applied to images with very high-contrast
+/// regions involving extra bright pixels (such as highlights in HDR
+/// captured or rendered images).  By compressing the range pixel values,
+/// then performing the operation, then expanding the range of the result
+/// again, the result can be much more pleasing (even if not exactly
+/// correct).
+///
+pub fn range_expand(
+    a: &ImageBuf,
+    use_luma: bool,
+    roi: Roi,
+    nthreads: usize,
+) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_rangeexpand(
+            &mut ptr,
+            a.ptr,
+            use_luma,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// `rangeexpand()` performs the inverse transformation (logarithmic back
+/// into linear).
+///
+/// If `useluma` is true, the luma of channels [roi.chbegin..roi.chbegin+2]
+/// (presumed to be R, G, and B) are used to compute a single scale factor
+/// for all color channels, rather than scaling all channels individually
+/// (which could result in a color shift).
+///
+/// The purpose of these function is as follows: Some image operations (such
+/// as resizing with a "good" filter that contains negative lobes) can have
+/// objectionable artifacts when applied to images with very high-contrast
+/// regions involving extra bright pixels (such as highlights in HDR
+/// captured or rendered images).  By compressing the range pixel values,
+/// then performing the operation, then expanding the range of the result
+/// again, the result can be much more pleasing (even if not exactly
+/// correct).
+///
+/// Write to an existing image `dst` (allocating if it is uninitialized).
+///
+pub fn range_expand_in(
+    dst: &mut ImageBuf,
+    a: &ImageBuf,
+    use_luma: bool,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_rangeexpand_in(
+            &mut result,
+            dst.ptr,
+            a.ptr,
+            use_luma,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Struct holding all the results computed by ImageBufAlgo::compare().
+/// (maxx,maxy,maxz,maxc) gives the pixel coordinates (x,y,z) and color
+/// channel of the pixel that differed maximally between the two images.
+/// nwarn and nfail are the number of "warnings" and "failures",
+/// respectively.
+///
+pub use sys::OIIO_ImageBufAlgo_CompareResults_t as CompareResults;
+
+/// Numerically compare two images.  The difference threshold (for any
+/// individual color channel in any pixel) for a "failure" is
+/// failthresh, and for a "warning" is warnthresh.  The results are
+/// stored in result.  If roi is defined, pixels will be compared for
+/// the pixel and channel range that is specified.  If roi is not
+/// defined, the comparison will be for all channels, on the union of
+/// the defined pixel windows of the two images (for either image,
+/// undefined pixels will be assumed to be black).
+///
+pub fn compare(
+    a: &ImageBuf,
+    b: &ImageBuf,
+    fail_threshold: f32,
+    warn_threshold: f32,
+    roi: Roi,
+    nthreads: usize,
+) -> CompareResults {
+    let mut results = CompareResults::default();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_compare(
+            &mut results,
+            a.ptr,
+            b.ptr,
+            fail_threshold,
+            warn_threshold,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    results
+}
+
+/// Compare two images using Hector Yee's perceptual metric, returning
+/// the number of pixels that fail the comparison.  Only the first three
+/// channels (or first three channels specified by `roi`) are compared.
+/// Free parameters are the ambient luminance in the room and the field
+/// of view of the image display; our defaults are probably reasonable
+/// guesses for an office environment.  The 'result' structure will
+/// store the maxerror, and the maxx, maxy, maxz of the pixel that
+/// failed most severely.  (The other fields of the CompareResults
+/// are not used for Yee comparison.)
+///
+/// Works for all pixel types.  But it's basically meaningless if the
+/// first three channels aren't RGB in a linear color space that sort
+/// of resembles AdobeRGB.
+///
+pub fn compare_yee(
+    a: &ImageBuf,
+    b: &ImageBuf,
+    luminance: f32,
+    fov: f32,
+    roi: Roi,
+    nthreads: usize,
+) -> usize {
+    let mut result = 0;
+    let mut compare_results = CompareResults::default();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_compare_Yee(
+            &mut result,
+            a.ptr,
+            b.ptr,
+            &mut compare_results,
+            luminance,
+            fov,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    result
+        .try_into()
+        .expect("result is not representable as i32")
+}
+
+/// Do all pixels within the ROI have the same values for channels
+/// `[roi.chbegin..roi.chend-1]`, within a tolerance of +/- `threshold`?  If
+/// so, return `true` and store that color in `color[chbegin...chend-1]` (if
+/// `color` is not empty); otherwise return `false`.  If `roi` is not
+/// defined (the default), it will be understood to be all of the defined
+/// pixels and channels of source.
+///
+pub fn is_constant_color(
+    src: &ImageBuf,
+    threshold: f32,
+    color: &mut [f32],
+    roi: Roi,
+    nthreads: usize,
+) -> bool {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_isConstantColor(
+            &mut result,
+            src.ptr,
+            threshold,
+            SpanF32Mut::from(color).0,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    result
+}
+
+/// Does the requested channel have a given value (within a tolerance of +/-
+/// `threshold`) for every channel within the ROI?  (For this function, the
+/// ROI's chbegin/chend are ignored.)  Return `true` if so, otherwise return
+/// `false`.  If `roi` is not defined (the default), it will be understood
+/// to be all of the defined pixels and channels of source.
+///
+pub fn is_constant_channel(
+    src: &ImageBuf,
+    channel: usize,
+    val: f32,
+    threshold: f32,
+    roi: Roi,
+    nthreads: usize,
+) -> bool {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_isConstantChannel(
+            &mut result,
+            src.ptr,
+            channel
+                .try_into()
+                .expect("channel is not representable as i32"),
+            val,
+            threshold,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    result
+}
+
+/// Is the image monochrome within the ROI, i.e., for every pixel within the
+/// region, do all channels [roi.chbegin, roi.chend) have the same value
+/// (within a tolerance of +/- threshold)?  If roi is not defined (the
+/// default), it will be understood to be all of the defined pixels and
+/// channels of source.
+///
+pub fn is_monochrome(
+    src: &ImageBuf,
+    threshold: f32,
+    roi: Roi,
+    nthreads: usize,
+) -> bool {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_isMonochrome(
+            &mut result,
+            src.ptr,
+            threshold,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    result
+}
+
+/// Count how many pixels in the image (within the ROI) are outside the
+/// value range described by `low[roi.chbegin..roi.chend-1]` and
+/// `high[roi.chbegin..roi.chend-1]` as the low and high acceptable values
+/// for each color channel.
+///
+/// On success, returns the tuple (low_count, high_count, in_range_count).
+///
+pub fn color_range_check(
+    src: &ImageBuf,
+    low: &[f32],
+    high: &[f32],
+    roi: Roi,
+    nthreads: usize,
+) -> Result<(usize, usize, usize)> {
+    let mut result = false;
+    let mut low_count = 0;
+    let mut high_count = 0;
+    let mut in_range_count = 0;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_color_range_check(
+            &mut result,
+            src.ptr,
+            &mut low_count,
+            &mut high_count,
+            &mut in_range_count,
+            SpanF32::from(low).0,
+            SpanF32::from(high).0,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok((low_count, high_count, in_range_count))
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Find the minimal rectangular region within `roi` (which defaults to the
+/// entire pixel data window of `src`) that consists of nonzero pixel
+/// values.  In other words, gives the region that is a "shrink-wraps" of
+/// `src` to exclude black border pixels.  Note that if the entire image was
+/// black, the ROI returned will contain no pixels.
+///
+/// For "deep" images, this function returns the smallest ROI that contains
+/// all pixels that contain depth samples, and excludes the border pixels
+/// that contain no depth samples at all.
+
+pub fn nonzero_region(src: &ImageBuf, roi: Roi, nthreads: usize) -> Roi {
+    let mut result = Roi::all();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_nonzero_region(
+            &mut result as *mut Roi as *mut sys::OIIO_ROI_t,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    result
+}
+
+/// Compute the SHA-1 byte hash for all the pixels in the specifed region of
+/// the image.  If `blocksize` > 0, the function will compute separate SHA-1
+/// hashes of each `blocksize` batch of scanlines, then return a hash of the
+/// individual hashes.  This is just as strong a hash, but will NOT match a
+/// single hash of the entire image (`blocksize==0`).  But by breaking up
+/// the hash into independent blocks, we can parallelize across multiple
+/// threads, given by `nthreads` (if `nthreads` is 0, it will use the global
+/// OIIO thread count).  The `extrainfo` provides additional text that will
+/// be incorporated into the hash.
+///
+pub fn compute_pixel_hash_sha1(
+    src: &ImageBuf,
+    extra_info: &str,
+    roi: Roi,
+    block_size: usize,
+    nthreads: usize,
+) -> String {
+    let mut result = CppString::new("");
+    unsafe {
+        sys::OIIO_ImageBufAlgo_computePixelHashSHA1(
+            &mut result.0,
+            src.ptr,
+            StringView::from(extra_info).0,
+            roi.into(),
+            block_size
+                .try_into()
+                .expect("block_size is not representable as i32"),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    result.as_str().to_string()
+}
+
+/// Compute the SHA-1 byte hash for all the pixels in the specifed region of
+/// the image.  If `blocksize` > 0, the function will compute separate SHA-1
+/// hashes of each `blocksize` batch of scanlines, then return a hash of the
+/// individual hashes.  This is just as strong a hash, but will NOT match a
+/// single hash of the entire image (`blocksize==0`).  But by breaking up
+/// the hash into independent blocks, we can parallelize across multiple
+/// threads, given by `nthreads` (if `nthreads` is 0, it will use the global
+/// OIIO thread count).  The `extrainfo` provides additional text that will
+/// be incorporated into the hash.
+///
+pub fn histogram(
+    src: &ImageBuf,
+    channel: usize,
+    num_bins: usize,
+    min: f32,
+    max: f32,
+    ignore_empty: bool,
+    roi: Roi,
+    nthreads: usize,
+) -> Vec<usize> {
+    let mut result = CppVectorSize::new();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_histogram(
+            &mut result.0,
+            src.ptr,
+            channel
+                .try_into()
+                .expect("channel is not representable as i32"),
+            num_bins
+                .try_into()
+                .expect("num_bins is not representable as i32"),
+            min,
+            max,
+            ignore_empty,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    result.as_slice().to_vec()
+}
+
+/// Make a 1-channel `float` image of the named kernel. The size of the
+/// image will be big enough to contain the kernel given its size (`width` x
+/// `height`) and rounded up to odd resolution so that the center of the
+/// kernel can be at the center of the middle pixel.  The kernel image will
+/// be offset so that its center is at the (0,0) coordinate.  If `normalize`
+/// is true, the values will be normalized so that they sum to 1.0. If
+/// `depth` > 1, a volumetric kernel will be created.  Use with caution!
+///
+/// Kernel names can be: "gaussian", "sharp-gaussian", "box",
+/// "triangle", "blackman-harris", "mitchell", "b-spline", "catmull-rom",
+/// "lanczos3", "disk", "binomial", "laplacian".
+///
+/// Note that "catmull-rom" and "lanczos3" are fixed-size kernels that
+/// don't scale with the width, and are therefore probably less useful
+/// in most cases.
+///
+pub fn make_kernel(
+    name: &str,
+    width: f32,
+    height: f32,
+    depth: f32,
+    normalize: bool,
+) -> Result<ImageBuf> {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_make_kernel(
+            &mut ptr,
+            StringView::from(name).0,
+            width,
+            height,
+            depth,
+            normalize,
+        );
+    }
+
+    let buf = ImageBuf { ptr };
+    if buf.has_error() {
+        Err(Error::Oiio(buf.get_error(true)))
+    } else {
+        Ok(buf)
+    }
+}
+
+/// Return the convolution of `src` and a `kernel`. If `roi` is not defined,
+/// it defaults to the full size `src`. If `normalized` is true, the kernel will
+/// be normalized for the  convolution, otherwise the original values will
+/// be used.
+pub fn convolve(
+    src: &ImageBuf,
+    kernel: &ImageBuf,
+    normalize: bool,
+    roi: Roi,
+    nthreads: usize,
+) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_convolve(
+            &mut ptr,
+            src.ptr,
+            kernel.ptr,
+            normalize,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// Return the convolution of `src` and a `kernel`. If `roi` is not defined,
+/// it defaults to the full size `src`. If `normalized` is true, the kernel will
+/// be normalized for the  convolution, otherwise the original values will
+/// be used.
+pub fn convolve_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    kernel: &ImageBuf,
+    normalize: bool,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_convolve_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            kernel.ptr,
+            normalize,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Return the Laplacian of the corresponding region of `src`.  The
+/// Laplacian is the generalized second derivative of the image
+///
+pub fn laplacian(src: &ImageBuf, roi: Roi, nthreads: usize) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_laplacian(
+            &mut ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// Return the Laplacian of the corresponding region of `src`.  The
+/// Laplacian is the generalized second derivative of the image
+///
+pub fn laplacian_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_laplacian_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Return (or copy into `dst`) the discrete Fourier transform (DFT), or its
+/// inverse, of the section of `src` denoted by roi,  If roi is not defined,
+/// it will be all of `src`'s pixels.
+///
+/// `fft()` takes the discrete Fourier transform (DFT) of the section of
+/// `src` denoted by `roi`, returning it or storing it in `dst`. If `roi` is
+/// not defined, it will be all of `src`'s pixels. Only one channel of `src`
+/// may be transformed at a time, so it will be the first channel described
+/// by `roi` (or, again, channel 0 if `roi` is undefined).  If not already
+/// in the correct format, `dst` will be re-allocated to be a 2-channel
+/// `float` buffer of size `roi.width()` x `roi.height`, with channel 0
+/// being the "real" part and channel 1 being the the "imaginary" part.  The
+/// values returned are actually the unitary DFT, meaning that it is scaled
+/// by 1/sqrt(npixels).
+///
+/// `ifft()` takes the inverse discrete Fourier transform, transforming a
+/// 2-channel complex (real and imaginary) frequency domain image and into a
+/// single-channel spatial domain image. `src` must be a 2-channel float
+/// image, and is assumed to be a complex frequency-domain signal with the
+/// "real" component in channel 0 and the "imaginary" component in channel 1.
+/// `dst` will end up being a float image of one channel (the real component
+/// is kept, the imaginary component of the spatial-domain will be
+/// discarded). Just as with `fft()`, the `ifft()` function is dealing with
+/// the unitary DFT, so it is scaled by 1/sqrt(npixels).
+///
+pub fn fft(src: &ImageBuf, roi: Roi, nthreads: usize) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_fft(
+            &mut ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// Return (or copy into `dst`) the discrete Fourier transform (DFT), or its
+/// inverse, of the section of `src` denoted by roi,  If roi is not defined,
+/// it will be all of `src`'s pixels.
+///
+/// `fft()` takes the discrete Fourier transform (DFT) of the section of
+/// `src` denoted by `roi`, returning it or storing it in `dst`. If `roi` is
+/// not defined, it will be all of `src`'s pixels. Only one channel of `src`
+/// may be transformed at a time, so it will be the first channel described
+/// by `roi` (or, again, channel 0 if `roi` is undefined).  If not already
+/// in the correct format, `dst` will be re-allocated to be a 2-channel
+/// `float` buffer of size `roi.width()` x `roi.height`, with channel 0
+/// being the "real" part and channel 1 being the the "imaginary" part.  The
+/// values returned are actually the unitary DFT, meaning that it is scaled
+/// by 1/sqrt(npixels).
+///
+/// `ifft()` takes the inverse discrete Fourier transform, transforming a
+/// 2-channel complex (real and imaginary) frequency domain image and into a
+/// single-channel spatial domain image. `src` must be a 2-channel float
+/// image, and is assumed to be a complex frequency-domain signal with the
+/// "real" component in channel 0 and the "imaginary" component in channel 1.
+/// `dst` will end up being a float image of one channel (the real component
+/// is kept, the imaginary component of the spatial-domain will be
+/// discarded). Just as with `fft()`, the `ifft()` function is dealing with
+/// the unitary DFT, so it is scaled by 1/sqrt(npixels).
+///
+pub fn fft_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_fft_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Return (or copy into `dst`) the discrete Fourier transform (DFT), or its
+/// inverse, of the section of `src` denoted by roi,  If roi is not defined,
+/// it will be all of `src`'s pixels.
+///
+/// `fft()` takes the discrete Fourier transform (DFT) of the section of
+/// `src` denoted by `roi`, returning it or storing it in `dst`. If `roi` is
+/// not defined, it will be all of `src`'s pixels. Only one channel of `src`
+/// may be transformed at a time, so it will be the first channel described
+/// by `roi` (or, again, channel 0 if `roi` is undefined).  If not already
+/// in the correct format, `dst` will be re-allocated to be a 2-channel
+/// `float` buffer of size `roi.width()` x `roi.height`, with channel 0
+/// being the "real" part and channel 1 being the the "imaginary" part.  The
+/// values returned are actually the unitary DFT, meaning that it is scaled
+/// by 1/sqrt(npixels).
+///
+/// `ifft()` takes the inverse discrete Fourier transform, transforming a
+/// 2-channel complex (real and imaginary) frequency domain image and into a
+/// single-channel spatial domain image. `src` must be a 2-channel float
+/// image, and is assumed to be a complex frequency-domain signal with the
+/// "real" component in channel 0 and the "imaginary" component in channel 1.
+/// `dst` will end up being a float image of one channel (the real component
+/// is kept, the imaginary component of the spatial-domain will be
+/// discarded). Just as with `fft()`, the `ifft()` function is dealing with
+/// the unitary DFT, so it is scaled by 1/sqrt(npixels).
+///
+pub fn inverse_fft(src: &ImageBuf, roi: Roi, nthreads: usize) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_ifft(
+            &mut ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// Return (or copy into `dst`) the discrete Fourier transform (DFT), or its
+/// inverse, of the section of `src` denoted by roi,  If roi is not defined,
+/// it will be all of `src`'s pixels.
+///
+/// `fft()` takes the discrete Fourier transform (DFT) of the section of
+/// `src` denoted by `roi`, returning it or storing it in `dst`. If `roi` is
+/// not defined, it will be all of `src`'s pixels. Only one channel of `src`
+/// may be transformed at a time, so it will be the first channel described
+/// by `roi` (or, again, channel 0 if `roi` is undefined).  If not already
+/// in the correct format, `dst` will be re-allocated to be a 2-channel
+/// `float` buffer of size `roi.width()` x `roi.height`, with channel 0
+/// being the "real" part and channel 1 being the the "imaginary" part.  The
+/// values returned are actually the unitary DFT, meaning that it is scaled
+/// by 1/sqrt(npixels).
+///
+/// `ifft()` takes the inverse discrete Fourier transform, transforming a
+/// 2-channel complex (real and imaginary) frequency domain image and into a
+/// single-channel spatial domain image. `src` must be a 2-channel float
+/// image, and is assumed to be a complex frequency-domain signal with the
+/// "real" component in channel 0 and the "imaginary" component in channel 1.
+/// `dst` will end up being a float image of one channel (the real component
+/// is kept, the imaginary component of the spatial-domain will be
+/// discarded). Just as with `fft()`, the `ifft()` function is dealing with
+/// the unitary DFT, so it is scaled by 1/sqrt(npixels).
+///
+pub fn inverse_fft_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_ifft_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// The `complex_to_polar()` function performs the reverse transformation,
+/// converting from  polar values (amplitude and phase) to complex (real and
+/// imaginary).
+///
+pub fn complex_to_polar(src: &ImageBuf, roi: Roi, nthreads: usize) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_complex_to_polar(
+            &mut ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// The `complex_to_polar()` function performs the reverse transformation,
+/// converting from  polar values (amplitude and phase) to complex (real and
+/// imaginary).
+///
+pub fn complex_to_polar_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_complex_to_polar_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// The `polar_to_complex()` function transforms a 2-channel image whose
+/// channels are interpreted as complex values (real and imaginary
+/// components) into the equivalent values expressed in polar form of
+/// amplitude and phase (with phase between 0 and \f$ 2\pi \f$.
+///
+pub fn polar_to_complex(src: &ImageBuf, roi: Roi, nthreads: usize) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_polar_to_complex(
+            &mut ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// The `polar_to_complex()` function transforms a 2-channel image whose
+/// channels are interpreted as complex values (real and imaginary
+/// components) into the equivalent values expressed in polar form of
+/// amplitude and phase (with phase between 0 and \f$ 2\pi \f$.
+///
+pub fn polar_to_complex_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_polar_to_complex_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+pub use sys::NonFiniteFixMode;
+
+/// `fixNonFinite()` returns in image containing the values of `src` (within
+/// the ROI), while repairing  any non-finite (NaN/Inf) pixels. If
+/// pixelsFixed is not nullptr, store in it the number of pixels that
+/// contained non-finite value.  It is permissible to operate in-place (with
+/// `src` and  `dst` referring to the same image).
+///
+/// How the non-finite values are repaired is specified by one of the `mode`
+/// parameter, which is an enum of `NonFiniteFixMode`.
+///
+/// This function works on all pixel data types, though it's just a copy for
+/// images with pixel data types that cannot represent NaN or Inf values.
+///
+pub fn fix_non_finite(
+    src: &ImageBuf,
+    mode: NonFiniteFixMode,
+    roi: Roi,
+    nthreads: usize,
+) -> (ImageBuf, usize) {
+    let mut ptr = std::ptr::null_mut();
+    let mut num = 0;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_fixNonFinite(
+            &mut ptr,
+            src.ptr,
+            mode.into(),
+            &mut num,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    (
+        ImageBuf { ptr },
+        num.try_into().expect("num not representable as usize"),
+    )
+}
+
+/// `fixNonFinite()` returns in image containing the values of `src` (within
+/// the ROI), while repairing  any non-finite (NaN/Inf) pixels. If
+/// pixelsFixed is not nullptr, store in it the number of pixels that
+/// contained non-finite value.  It is permissible to operate in-place (with
+/// `src` and  `dst` referring to the same image).
+///
+/// How the non-finite values are repaired is specified by one of the `mode`
+/// parameter, which is an enum of `NonFiniteFixMode`.
+///
+/// This function works on all pixel data types, though it's just a copy for
+/// images with pixel data types that cannot represent NaN or Inf values.
+///
+pub fn fix_non_finite_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    mode: NonFiniteFixMode,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<usize> {
+    let mut result = false;
+    let mut num = 0;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_fixNonFinite_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            mode.into(),
+            &mut num,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(num.try_into().expect("num not representable as usize"))
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Copy the specified ROI of `src` and fill any holes (pixels where alpha <
+/// 1) with plausible values using a push-pull technique. The `src` image
+/// must have an alpha channel.  The `dst` image will end up with a copy of
+/// `src`, but will have an alpha of 1.0 everywhere within `roi`, and any
+/// place where the alpha of `src` was < 1, `dst` will have a pixel color
+/// that is a plausible "filling" of the original alpha hole.
+///
+pub fn fill_holes_push_pull(
+    src: &ImageBuf,
+    roi: Roi,
+    nthreads: usize,
+) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_fillholes_pushpull(
+            &mut ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// Copy the specified ROI of `src` and fill any holes (pixels where alpha <
+/// 1) with plausible values using a push-pull technique. The `src` image
+/// must have an alpha channel.  The `dst` image will end up with a copy of
+/// `src`, but will have an alpha of 1.0 everywhere within `roi`, and any
+/// place where the alpha of `src` was < 1, `dst` will have a pixel color
+/// that is a plausible "filling" of the original alpha hole.
+///
+pub fn fill_holes_push_pull_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_fillholes_pushpull_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Return a median-filtered version of the corresponding region of `src`.
+/// The median filter replaces each pixel with the median value underneath
+/// the `width` x `height` window surrounding it. If `height` <= 0, it will
+/// be set to `width`, making a square window.
+///
+/// Median filters are good for removing high-frequency detail smaller than
+/// the window size (including noise), without blurring edges that are
+/// larger than the window size.
+///
+pub fn median_filter(
+    src: &ImageBuf,
+    width: usize,
+    height: usize,
+    roi: Roi,
+    nthreads: usize,
+) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_median_filter(
+            &mut ptr,
+            src.ptr,
+            width.try_into().expect("width is not representable as i32"),
+            height
+                .try_into()
+                .expect("width is not representable as i32"),
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// Return a median-filtered version of the corresponding region of `src`.
+/// The median filter replaces each pixel with the median value underneath
+/// the `width` x `height` window surrounding it. If `height` <= 0, it will
+/// be set to `width`, making a square window.
+///
+/// Median filters are good for removing high-frequency detail smaller than
+/// the window size (including noise), without blurring edges that are
+/// larger than the window size.
+///
+pub fn median_filter_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    width: usize,
+    height: usize,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_median_filter_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            width.try_into().expect("width is not representable as i32"),
+            height
+                .try_into()
+                .expect("width is not representable as i32"),
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Return a sharpened version of the corresponding region of `src` using
+/// the "unsharp mask" technique. Unsharp masking basically works by first
+/// blurring the image (low pass filter), subtracting this from the original
+/// image, then adding the residual back to the original to emphasize the
+/// edges. Roughly speaking,
+///
+/// dst = src + contrast * thresh(src - blur(src))
+///
+/// The specific blur can be selected by kernel name and width (for example,
+/// "gaussian" is typical). As a special case, "median" is also accepted as
+/// the kernel name, in which case a median filter is performed rather than
+/// a blurring convolution (Gaussian and other blurs sometimes over-sharpen
+/// edges, whereas using the median filter will sharpen compact
+/// high-frequency details while not over-sharpening long edges).
+///
+/// The `contrast` is a multiplier on the overall sharpening effect.  The
+/// thresholding step causes all differences less than `threshold` to be
+/// squashed to zero, which can be useful for suppressing sharpening of
+/// low-contrast details (like noise) but allow sharpening of
+/// higher-contrast edges.
+///
+pub fn unsharp_mask(
+    src: &ImageBuf,
+    kernel: &str,
+    width: f32,
+    contrast: f32,
+    threshold: f32,
+    roi: Roi,
+    nthreads: usize,
+) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_unsharp_mask(
+            &mut ptr,
+            src.ptr,
+            StringView::from(kernel).0,
+            width,
+            contrast,
+            threshold,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// Return a sharpened version of the corresponding region of `src` using
+/// the "unsharp mask" technique. Unsharp masking basically works by first
+/// blurring the image (low pass filter), subtracting this from the original
+/// image, then adding the residual back to the original to emphasize the
+/// edges. Roughly speaking,
+///
+/// dst = src + contrast * thresh(src - blur(src))
+///
+/// The specific blur can be selected by kernel name and width (for example,
+/// "gaussian" is typical). As a special case, "median" is also accepted as
+/// the kernel name, in which case a median filter is performed rather than
+/// a blurring convolution (Gaussian and other blurs sometimes over-sharpen
+/// edges, whereas using the median filter will sharpen compact
+/// high-frequency details while not over-sharpening long edges).
+///
+/// The `contrast` is a multiplier on the overall sharpening effect.  The
+/// thresholding step causes all differences less than `threshold` to be
+/// squashed to zero, which can be useful for suppressing sharpening of
+/// low-contrast details (like noise) but allow sharpening of
+/// higher-contrast edges.
+///
+pub fn unsharp_mask_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    kernel: &str,
+    width: f32,
+    contrast: f32,
+    threshold: f32,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_unsharp_mask_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            StringView::from(kernel).0,
+            width,
+            contrast,
+            threshold,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Return a dilated version of the corresponding region of `src`. Dilation
+/// is defined as the maximum value of all pixels under nonzero values of
+/// the structuring element (which is taken to be a width x height square).
+/// If height is not set, it will default to be the same as width. Dilation
+/// makes bright features wider and more prominent, dark features thinner,
+/// and removes small isolated dark spots.
+///
+pub fn dilate(
+    src: &ImageBuf,
+    width: usize,
+    height: usize,
+    roi: Roi,
+    nthreads: usize,
+) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_dilate(
+            &mut ptr,
+            src.ptr,
+            width.try_into().expect("width is not representable as i32"),
+            height
+                .try_into()
+                .expect("width is not representable as i32"),
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// Return a dilated version of the corresponding region of `src`. Dilation
+/// is defined as the maximum value of all pixels under nonzero values of
+/// the structuring element (which is taken to be a width x height square).
+/// If height is not set, it will default to be the same as width. Dilation
+/// makes bright features wider and more prominent, dark features thinner,
+/// and removes small isolated dark spots.
+///
+pub fn dilate_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    width: usize,
+    height: usize,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_dilate_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            width.try_into().expect("width is not representable as i32"),
+            height
+                .try_into()
+                .expect("width is not representable as i32"),
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Return an eroded version of the corresponding region of `src`. Erosion
+/// is defined as the minimum value of all pixels under nonzero values of
+/// the structuring element (which is taken to be a width x height square).
+/// If height is not set, it will default to be the same as width. Erosion
+/// makes dark features wider, bright features thinner, and removes small
+/// isolated bright spots.
+///
+pub fn erode(
+    src: &ImageBuf,
+    width: usize,
+    height: usize,
+    roi: Roi,
+    nthreads: usize,
+) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_erode(
+            &mut ptr,
+            src.ptr,
+            width.try_into().expect("width is not representable as i32"),
+            height
+                .try_into()
+                .expect("width is not representable as i32"),
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// Return an eroded version of the corresponding region of `src`. Erosion
+/// is defined as the minimum value of all pixels under nonzero values of
+/// the structuring element (which is taken to be a width x height square).
+/// If height is not set, it will default to be the same as width. Erosion
+/// makes dark features wider, bright features thinner, and removes small
+/// isolated bright spots.
+///
+pub fn erode_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    width: usize,
+    height: usize,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_erode_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            width.try_into().expect("width is not representable as i32"),
+            height
+                .try_into()
+                .expect("width is not representable as i32"),
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+pub fn color_convert(
+    src: &ImageBuf,
+    from_space: &str,
+    to_space: &str,
+    unpremult: bool,
+    context_key: &str,
+    context_value: &str,
+    color_config: &ColorConfig,
+    roi: Roi,
+    nthreads: usize,
+) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_colorconvert(
+            &mut ptr,
+            src.ptr,
+            StringView::from(from_space).0,
+            StringView::from(to_space).0,
+            unpremult,
+            StringView::from(context_key).0,
+            StringView::from(context_value).0,
+            color_config.0,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+pub fn color_convert_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    from_space: &str,
+    to_space: &str,
+    unpremult: bool,
+    context_key: &str,
+    context_value: &str,
+    color_config: &ColorConfig,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_colorconvert_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            StringView::from(from_space).0,
+            StringView::from(to_space).0,
+            unpremult,
+            StringView::from(context_key).0,
+            StringView::from(context_value).0,
+            color_config.0,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+pub fn color_convert_with_processor(
+    src: &ImageBuf,
+    color_processor: &ColorProcessor,
+    unpremult: bool,
+    roi: Roi,
+    nthreads: usize,
+) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_colorconvert_with_processor(
+            &mut ptr,
+            src.ptr,
+            color_processor.get_raw_ptr(),
+            unpremult,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+pub fn color_convert_with_processor_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    color_processor: &ColorProcessor,
+    unpremult: bool,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_colorconvert_with_processor_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            color_processor.get_raw_ptr(),
+            unpremult,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Return a copy of the pixels of `src` within the ROI, applying a color
+/// transform specified by a 4x4 matrix.  In-place operations
+/// (`dst` == `src`) are supported.
+///
+/// The first three channels are presumed to be the color to be
+/// transformed, and the fourth channel (if it exists) is presumed to be
+/// alpha. Any additional channels will be simply copied unaltered.
+///
+pub fn color_matrix_transform<M: Matrix44<f32>>(
+    src: &ImageBuf,
+    matrix: &M,
+    unpremult: bool,
+    roi: Roi,
+    nthreads: usize,
+) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_colormatrixtransform(
+            &mut ptr,
+            src.ptr,
+            matrix as *const _ as *const sys::Imath_M44f_t,
+            unpremult,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// Return a copy of the pixels of `src` within the ROI, applying a color
+/// transform specified by a 4x4 matrix.  In-place operations
+/// (`dst` == `src`) are supported.
+///
+/// The first three channels are presumed to be the color to be
+/// transformed, and the fourth channel (if it exists) is presumed to be
+/// alpha. Any additional channels will be simply copied unaltered.
+///
+pub fn color_matrix_transform_in<M: Matrix44<f32>>(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    matrix: &M,
+    unpremult: bool,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_colormatrixtransform_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            matrix as *const _ as *const sys::Imath_M44f_t,
+            unpremult,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Return a copy of the pixels of `src` within the ROI, applying an
+/// OpenColorIO "look" transform to the pixel values. In-place operations
+/// (`dst` == `src`) are supported.
+///
+/// The first three channels are presumed to be the color to be
+/// transformed, and the fourth channel (if it exists) is presumed to be
+/// alpha. Any additional channels will be simply copied unaltered.
+///
+/// * looks
+///             The looks to apply (comma-separated).
+/// * fromspace/tospace
+///             For the varieties of `colorconvert()` that use named color
+///             spaces, these specify the color spaces by name.
+/// * unpremult
+///             If true, unpremultiply the image (divide the RGB channels by
+///             alpha if it exists and is nonzero) before color conversion,
+///             then repremult after the after the color conversion. Passing
+///             unpremult=false skips this step, which may be desirable if
+///             you know that the image is "unassociated alpha" (a.k.a.,
+///             "not pre-multiplied colors").
+/// * inverse
+///             If `true`, it will reverse the color transformation and look
+///             application.
+/// * context_key/context_value
+///             Optional key/value to establish a context (for example, a
+///             shot-specific transform).
+/// * colorconfig
+///             An optional `ColorConfig*` specifying an OpenColorIO
+///             configuration. If not supplied, the default OpenColorIO
+///             color configuration found by examining the `$OCIO`
+///             environment variable will be used instead.
+///
+pub fn ocio_look(
+    src: &ImageBuf,
+    looks: &str,
+    from_space: &str,
+    to_space: &str,
+    unpremult: bool,
+    inverse: bool,
+    context_key: &str,
+    context_value: &str,
+    color_config: Option<&ColorConfig>,
+    roi: Roi,
+    nthreads: usize,
+) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_ociolook(
+            &mut ptr,
+            src.ptr,
+            StringView::from(looks).0,
+            StringView::from(from_space).0,
+            StringView::from(to_space).0,
+            unpremult,
+            inverse,
+            StringView::from(context_key).0,
+            StringView::from(context_value).0,
+            if let Some(cc) = color_config {
+                cc.0
+            } else {
+                std::ptr::null_mut()
+            },
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// Return a copy of the pixels of `src` within the ROI, applying an
+/// OpenColorIO "look" transform to the pixel values. In-place operations
+/// (`dst` == `src`) are supported.
+///
+/// The first three channels are presumed to be the color to be
+/// transformed, and the fourth channel (if it exists) is presumed to be
+/// alpha. Any additional channels will be simply copied unaltered.
+///
+/// * looks
+///             The looks to apply (comma-separated).
+/// * fromspace/tospace
+///             For the varieties of `colorconvert()` that use named color
+///             spaces, these specify the color spaces by name.
+/// * unpremult
+///             If true, unpremultiply the image (divide the RGB channels by
+///             alpha if it exists and is nonzero) before color conversion,
+///             then repremult after the after the color conversion. Passing
+///             unpremult=false skips this step, which may be desirable if
+///             you know that the image is "unassociated alpha" (a.k.a.,
+///             "not pre-multiplied colors").
+/// * inverse
+///             If `true`, it will reverse the color transformation and look
+///             application.
+/// * context_key/context_value
+///             Optional key/value to establish a context (for example, a
+///             shot-specific transform).
+/// * colorconfig
+///             An optional `ColorConfig*` specifying an OpenColorIO
+///             configuration. If not supplied, the default OpenColorIO
+///             color configuration found by examining the `$OCIO`
+///             environment variable will be used instead.
+///
+pub fn ocio_look_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    looks: &str,
+    from_space: &str,
+    to_space: &str,
+    unpremult: bool,
+    inverse: bool,
+    context_key: &str,
+    context_value: &str,
+    color_config: Option<&ColorConfig>,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_ociolook_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            StringView::from(looks).0,
+            StringView::from(from_space).0,
+            StringView::from(to_space).0,
+            unpremult,
+            inverse,
+            StringView::from(context_key).0,
+            StringView::from(context_value).0,
+            if let Some(cc) = color_config {
+                cc.0
+            } else {
+                std::ptr::null_mut()
+            },
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Return a copy of the pixels of `src` within the ROI, applying an
+/// OpenColorIO "display" transform to the pixel values. In-place operations
+/// (`dst` == `src`) are supported.
+///
+/// The first three channels are presumed to be the color to be
+/// transformed, and the fourth channel (if it exists) is presumed to be
+/// alpha. Any additional channels will be simply copied unaltered.
+///
+/// * displays
+///             The displays to apply (comma-separated).
+/// * fromspace/tospace
+///             For the varieties of `colorconvert()` that use named color
+///             spaces, these specify the color spaces by name.
+/// * unpremult
+///             If true, unpremultiply the image (divide the RGB channels by
+///             alpha if it exists and is nonzero) before color conversion,
+///             then repremult after the after the color conversion. Passing
+///             unpremult=false skips this step, which may be desirable if
+///             you know that the image is "unassociated alpha" (a.k.a.,
+///             "not pre-multiplied colors").
+/// * inverse
+///             If `true`, it will reverse the color transformation and display
+///             application.
+/// * context_key/context_value
+///             Optional key/value to establish a context (for example, a
+///             shot-specific transform).
+/// * colorconfig
+///             An optional `ColorConfig*` specifying an OpenColorIO
+///             configuration. If not supplied, the default OpenColorIO
+///             color configuration found by examining the `$OCIO`
+///             environment variable will be used instead.
+///
+pub fn ocio_display(
+    src: &ImageBuf,
+    display: &str,
+    view: &str,
+    from_space: &str,
+    to_space: &str,
+    unpremult: bool,
+    context_key: &str,
+    context_value: &str,
+    color_config: Option<&ColorConfig>,
+    roi: Roi,
+    nthreads: usize,
+) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_ociodisplay(
+            &mut ptr,
+            src.ptr,
+            StringView::from(display).0,
+            StringView::from(view).0,
+            StringView::from(from_space).0,
+            StringView::from(to_space).0,
+            unpremult,
+            StringView::from(context_key).0,
+            StringView::from(context_value).0,
+            if let Some(cc) = color_config {
+                cc.0
+            } else {
+                std::ptr::null_mut()
+            },
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// Return a copy of the pixels of `src` within the ROI, applying an
+/// OpenColorIO "display" transform to the pixel values. In-place operations
+/// (`dst` == `src`) are supported.
+///
+/// The first three channels are presumed to be the color to be
+/// transformed, and the fourth channel (if it exists) is presumed to be
+/// alpha. Any additional channels will be simply copied unaltered.
+///
+/// * displays
+///             The displays to apply (comma-separated).
+/// * fromspace/tospace
+///             For the varieties of `colorconvert()` that use named color
+///             spaces, these specify the color spaces by name.
+/// * unpremult
+///             If true, unpremultiply the image (divide the RGB channels by
+///             alpha if it exists and is nonzero) before color conversion,
+///             then repremult after the after the color conversion. Passing
+///             unpremult=false skips this step, which may be desirable if
+///             you know that the image is "unassociated alpha" (a.k.a.,
+///             "not pre-multiplied colors").
+/// * inverse
+///             If `true`, it will reverse the color transformation and display
+///             application.
+/// * context_key/context_value
+///             Optional key/value to establish a context (for example, a
+///             shot-specific transform).
+/// * colorconfig
+///             An optional `ColorConfig*` specifying an OpenColorIO
+///             configuration. If not supplied, the default OpenColorIO
+///             color configuration found by examining the `$OCIO`
+///             environment variable will be used instead.
+///
+pub fn ocio_display_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    display: &str,
+    view: &str,
+    from_space: &str,
+    to_space: &str,
+    unpremult: bool,
+    context_key: &str,
+    context_value: &str,
+    color_config: Option<&ColorConfig>,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_ociodisplay_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            StringView::from(display).0,
+            StringView::from(view).0,
+            StringView::from(from_space).0,
+            StringView::from(to_space).0,
+            unpremult,
+            StringView::from(context_key).0,
+            StringView::from(context_value).0,
+            if let Some(cc) = color_config {
+                cc.0
+            } else {
+                std::ptr::null_mut()
+            },
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Return the pixels of `src` within the ROI, applying an OpenColorIO
+/// "file" transform. In-place operations (`dst` == `src`) are supported.
+///
+/// The first three channels are presumed to be the color to be
+/// transformed, and the fourth channel (if it exists) is presumed to be
+/// alpha. Any additional channels will be simply copied unaltered.
+///
+/// * name
+///             The name of the file containing the transform information.
+/// * unpremult
+///             If true, unpremultiply the image (divide the RGB channels by
+///             alpha if it exists and is nonzero) before color conversion,
+///             then repremult after the after the color conversion. Passing
+///             unpremult=false skips this step, which may be desirable if
+///             you know that the image is "unassociated alpha" (a.k.a.,
+///             "not pre-multiplied colors").
+/// * inverse
+///             If `true`, it will reverse the color transformation.
+/// * colorconfig
+///             An optional `ColorConfig*` specifying an OpenColorIO
+///             configuration. If not supplied, the default OpenColorIO
+///             color configuration found by examining the `$OCIO`
+///             environment variable will be used instead.
+///
+pub fn ocio_file_transform(
+    src: &ImageBuf,
+    name: &str,
+    unpremult: bool,
+    inverse: bool,
+    color_config: Option<&ColorConfig>,
+    roi: Roi,
+    nthreads: usize,
+) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_ociofiletransform(
+            &mut ptr,
+            src.ptr,
+            StringView::from(name).0,
+            unpremult,
+            inverse,
+            if let Some(cc) = color_config {
+                cc.0
+            } else {
+                std::ptr::null_mut()
+            },
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// Return the pixels of `src` within the ROI, applying an OpenColorIO
+/// "file" transform. In-place operations (`dst` == `src`) are supported.
+///
+/// The first three channels are presumed to be the color to be
+/// transformed, and the fourth channel (if it exists) is presumed to be
+/// alpha. Any additional channels will be simply copied unaltered.
+///
+/// * name
+///             The name of the file containing the transform information.
+/// * unpremult
+///             If true, unpremultiply the image (divide the RGB channels by
+///             alpha if it exists and is nonzero) before color conversion,
+///             then repremult after the after the color conversion. Passing
+///             unpremult=false skips this step, which may be desirable if
+///             you know that the image is "unassociated alpha" (a.k.a.,
+///             "not pre-multiplied colors").
+/// * inverse
+///             If `true`, it will reverse the color transformation.
+/// * colorconfig
+///             An optional `ColorConfig*` specifying an OpenColorIO
+///             configuration. If not supplied, the default OpenColorIO
+///             color configuration found by examining the `$OCIO`
+///             environment variable will be used instead.
+///
+pub fn ocio_file_transform_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    name: &str,
+    unpremult: bool,
+    inverse: bool,
+    color_config: Option<&ColorConfig>,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_ociofiletransform_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            StringView::from(name).0,
+            unpremult,
+            inverse,
+            if let Some(cc) = color_config {
+                cc.0
+            } else {
+                std::ptr::null_mut()
+            },
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// The `unpremult` operation returns (or copies into `dst`) the pixels of
+/// `src` within the ROI, and in the process divides all color channels
+/// (those not alpha or z) by the alpha value, to "un-premultiply" them.
+/// This presumes that the image starts of as "associated alpha" a.k.a.
+/// "premultipled," and you are converting to "unassociated alpha." For
+/// pixels with alpha == 0, the color values are not modified.
+///
+pub fn unpremult(src: &ImageBuf, roi: Roi, nthreads: usize) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_unpremult(
+            &mut ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// The `unpremult` operation returns (or copies into `dst`) the pixels of
+/// `src` within the ROI, and in the process divides all color channels
+/// (those not alpha or z) by the alpha value, to "un-premultiply" them.
+/// This presumes that the image starts of as "associated alpha" a.k.a.
+/// "premultipled," and you are converting to "unassociated alpha." For
+/// pixels with alpha == 0, the color values are not modified.
+///
+pub fn unpremult_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_unpremult_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// The `premult` operation returns (or copies into `dst`) the pixels of
+/// `src` within the ROI, and in the process multiplies all color channels
+/// (those not alpha or z) by the alpha value, to "premultiply" them.  This
+/// presumes that the image starts of as "unassociated alpha" a.k.a.
+/// "non-premultipled" and converts it to "associated alpha / premultipled."
+///
+pub fn premult(src: &ImageBuf, roi: Roi, nthreads: usize) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_premult(
+            &mut ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// The `premult` operation returns (or copies into `dst`) the pixels of
+/// `src` within the ROI, and in the process multiplies all color channels
+/// (those not alpha or z) by the alpha value, to "premultiply" them.  This
+/// presumes that the image starts of as "unassociated alpha" a.k.a.
+/// "non-premultipled" and converts it to "associated alpha / premultipled."
+///
+pub fn premult_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_premult_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// The `repremult` operation is like `premult`, but preserves the color
+/// values of pixels whose alpha is 0. This is intended for cases where you
+/// unpremult, do an operation (such as color transforms), then want to
+/// return to associated/premultiplied alpha -- in that case, you want to
+/// make sure that "glow" pixels (those with alpha=0 but RGB > 0) are
+/// preserved for the round trip, and not crushed to black. This use case is
+/// distinct from a simple `premult` that is a one-time conversion from
+/// unassociated to associated alpha.
+///
+pub fn repremult(src: &ImageBuf, roi: Roi, nthreads: usize) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_repremult(
+            &mut ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// The `repremult` operation is like `premult`, but preserves the color
+/// values of pixels whose alpha is 0. This is intended for cases where you
+/// unpremult, do an operation (such as color transforms), then want to
+/// return to associated/premultiplied alpha -- in that case, you want to
+/// make sure that "glow" pixels (those with alpha=0 but RGB > 0) are
+/// preserved for the round trip, and not crushed to black. This use case is
+/// distinct from a simple `premult` that is a one-time conversion from
+/// unassociated to associated alpha.
+///
+pub fn repremult_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_repremult_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Return the "deep" equivalent of the "flat" input `src`. Turning a flat
+/// image into a deep one means:
+///
+/// * If the `src` image has a "Z" channel: if the source pixel's Z channel
+///   value is not infinite, the corresponding pixel of `dst` will get a
+///   single depth sample that copies the data from the source pixel;
+///   otherwise, dst will get an empty pixel. In other words, infinitely far
+///   pixels will not turn into deep samples.
+///
+/// * If the `src` image lacks a "Z" channel: if any of the source pixel's
+///   channel values are nonzero, the corresponding pixel of `dst` will get
+///   a single depth sample that copies the data from the source pixel and
+///   uses the zvalue parameter for the depth; otherwise, if all source
+///   channels in that pixel are zero, the destination pixel will get no
+///   depth samples.
+///
+/// If `src` is already a deep image, it will just copy pixel values from
+/// `src`.
+///
+pub fn deepen(
+    src: &ImageBuf,
+    z_value: f32,
+    roi: Roi,
+    nthreads: usize,
+) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_deepen(
+            &mut ptr,
+            src.ptr,
+            z_value,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// Return the "deep" equivalent of the "flat" input `src`. Turning a flat
+/// image into a deep one means:
+///
+/// * If the `src` image has a "Z" channel: if the source pixel's Z channel
+///   value is not infinite, the corresponding pixel of `dst` will get a
+///   single depth sample that copies the data from the source pixel;
+///   otherwise, dst will get an empty pixel. In other words, infinitely far
+///   pixels will not turn into deep samples.
+///
+/// * If the `src` image lacks a "Z" channel: if any of the source pixel's
+///   channel values are nonzero, the corresponding pixel of `dst` will get
+///   a single depth sample that copies the data from the source pixel and
+///   uses the zvalue parameter for the depth; otherwise, if all source
+///   channels in that pixel are zero, the destination pixel will get no
+///   depth samples.
+///
+/// If `src` is already a deep image, it will just copy pixel values from
+/// `src`.
+///
+pub fn deepen_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    z_value: f32,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_deepen_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            z_value,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Return the "flattened" composite of deep image `src`. That is, it
+/// converts a deep image to a simple flat image by front-to- back
+/// compositing the samples within each pixel.  If `src` is already a
+/// non-deep/flat image, it will just copy pixel values from `src` to `dst`.
+/// If `dst` is not already an initialized ImageBuf, it will be sized to
+/// match `src` (but made non-deep).
+///
+pub fn flatten(src: &ImageBuf, roi: Roi, nthreads: usize) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_flatten(
+            &mut ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// Return the "flattened" composite of deep image `src`. That is, it
+/// converts a deep image to a simple flat image by front-to- back
+/// compositing the samples within each pixel.  If `src` is already a
+/// non-deep/flat image, it will just copy pixel values from `src` to `dst`.
+/// If `dst` is not already an initialized ImageBuf, it will be sized to
+/// match `src` (but made non-deep).
+///
+pub fn flatten_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_flatten_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Return the deep merge of the samples of deep images `A` and `B`,
+/// overwriting any existing samples of `dst` in the ROI. If
+/// `occlusion_cull` is true, any samples occluded by an opaque sample will
+/// be deleted.
+///
+pub fn deep_merge(
+    a: &ImageBuf,
+    b: &ImageBuf,
+    occlusion_cull: bool,
+    roi: Roi,
+    nthreads: usize,
+) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_deep_merge(
+            &mut ptr,
+            a.ptr,
+            b.ptr,
+            occlusion_cull,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// Return the deep merge of the samples of deep images `A` and `B`,
+/// overwriting any existing samples of `dst` in the ROI. If
+/// `occlusion_cull` is true, any samples occluded by an opaque sample will
+/// be deleted.
+///
+pub fn deep_merge_in(
+    dst: &mut ImageBuf,
+    a: &ImageBuf,
+    b: &ImageBuf,
+    occlusion_cull: bool,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_deep_merge_in(
+            &mut result,
+            dst.ptr,
+            a.ptr,
+            b.ptr,
+            occlusion_cull,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
+}
+
+/// Return the deep merge of the samples of deep images `A` and `B`,
+/// overwriting any existing samples of `dst` in the ROI. If
+/// `occlusion_cull` is true, any samples occluded by an opaque sample will
+/// be deleted.
+///
+pub fn deep_holdout(
+    src: &ImageBuf,
+    holdout: &ImageBuf,
+    roi: Roi,
+    nthreads: usize,
+) -> ImageBuf {
+    let mut ptr = std::ptr::null_mut();
+    unsafe {
+        sys::OIIO_ImageBufAlgo_deep_holdout(
+            &mut ptr,
+            src.ptr,
+            holdout.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    ImageBuf { ptr }
+}
+
+/// Return the deep holdout of the samples of deep images `A` and `B`,
+/// overwriting any existing samples of `dst` in the ROI. If
+/// `occlusion_cull` is true, any samples occluded by an opaque sample will
+/// be deleted.
+///
+pub fn deep_holdout_in(
+    dst: &mut ImageBuf,
+    src: &ImageBuf,
+    holdout: &ImageBuf,
+    roi: Roi,
+    nthreads: usize,
+) -> Result<()> {
+    let mut result = false;
+    unsafe {
+        sys::OIIO_ImageBufAlgo_deep_holdout_in(
+            &mut result,
+            dst.ptr,
+            src.ptr,
+            holdout.ptr,
+            roi.into(),
+            nthreads
+                .try_into()
+                .expect("nthreads is not representable as i32"),
+        );
+    }
+
+    if result {
+        Ok(())
+    } else {
+        Err(Error::Oiio(get_error(true)))
+    }
 }

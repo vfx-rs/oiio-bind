@@ -112,6 +112,68 @@ impl Default for CppVectorFloat {
 }
 
 #[repr(transparent)]
+pub struct CppVectorDouble(pub(crate) *mut sys::std_vector_double_t);
+
+unsafe impl OpaquePtr for CppVectorDouble {
+    type SysPointee = sys::std_vector_double_t;
+    type Pointee = CppVectorDouble;
+}
+
+pub type CppVectorDoubleRef<'a, P = CppVectorDouble> = Ref<'a, P>;
+pub type CppVectorDoubleRefMut<'a, P = CppVectorDouble> = RefMut<'a, P>;
+
+impl CppVectorDouble {
+    pub fn new() -> CppVectorDouble {
+        let mut ptr = std::ptr::null_mut();
+        unsafe {
+            sys::std_vector_double_ctor(&mut ptr).into_result().unwrap();
+        }
+        CppVectorDouble(ptr)
+    }
+
+    pub fn from_slice(vec: &[f64]) -> CppVectorDouble {
+        let mut ptr = std::ptr::null_mut();
+        unsafe {
+            sys::std_vector_double_ctor(&mut ptr).into_result().unwrap();
+
+            for rs in vec {
+                sys::std_vector_double_push_back(ptr, rs)
+                    .into_result()
+                    .unwrap();
+            }
+        }
+
+        CppVectorDouble(ptr)
+    }
+
+    pub fn as_slice(&self) -> &[f64] {
+        let mut size = 0;
+        let mut ptr = std::ptr::null();
+        unsafe {
+            sys::std_vector_double_size(self.0, &mut size);
+            sys::std_vector_double_data_const(self.0, &mut ptr);
+            std::slice::from_raw_parts(ptr, size as usize)
+        }
+    }
+
+    pub fn as_slice_mut(&mut self) -> &mut [f64] {
+        let mut size = 0;
+        let mut ptr = std::ptr::null_mut();
+        unsafe {
+            sys::std_vector_double_size(self.0, &mut size);
+            sys::std_vector_double_data(self.0, &mut ptr);
+            std::slice::from_raw_parts_mut(ptr, size as usize)
+        }
+    }
+}
+
+impl Default for CppVectorDouble {
+    fn default() -> Self {
+        CppVectorDouble::new()
+    }
+}
+
+#[repr(transparent)]
 pub struct CppVectorString(pub(crate) *mut sys::std_vector_string_t);
 
 unsafe impl OpaquePtr for CppVectorString {
@@ -248,5 +310,73 @@ impl CppVectorTypeDesc {
 impl Default for CppVectorTypeDesc {
     fn default() -> Self {
         CppVectorTypeDesc::new()
+    }
+}
+
+#[repr(transparent)]
+pub struct CppVectorSize(pub(crate) *mut sys::std_vector_size_t_t);
+
+unsafe impl OpaquePtr for CppVectorSize {
+    type SysPointee = sys::std_vector_size_t_t;
+    type Pointee = CppVectorSize;
+}
+
+pub type CppVectorSizeRef<'a, P = CppVectorSize> = Ref<'a, P>;
+pub type CppVectorSizeRefMut<'a, P = CppVectorSize> = RefMut<'a, P>;
+
+impl CppVectorSize {
+    pub fn new() -> CppVectorSize {
+        let mut ptr = std::ptr::null_mut();
+        unsafe {
+            sys::std_vector_size_t_ctor(&mut ptr).into_result().unwrap();
+        }
+        CppVectorSize(ptr)
+    }
+
+    pub fn from_slice(vec: &[usize]) -> CppVectorSize {
+        let mut ptr = std::ptr::null_mut();
+        unsafe {
+            sys::std_vector_size_t_ctor(&mut ptr).into_result().unwrap();
+
+            for rs in vec {
+                sys::std_vector_size_t_push_back(
+                    ptr,
+                    rs as *const usize as *const u64,
+                )
+                .into_result()
+                .unwrap();
+            }
+        }
+
+        CppVectorSize(ptr)
+    }
+
+    pub fn as_slice(&self) -> &[usize] {
+        let mut size = 0;
+        let mut ptr = std::ptr::null();
+        unsafe {
+            sys::std_vector_size_t_size(self.0, &mut size);
+            sys::std_vector_size_t_data_const(
+                self.0,
+                &mut ptr as *mut _ as *mut *const u64,
+            );
+            std::slice::from_raw_parts(ptr, size as usize)
+        }
+    }
+
+    pub fn as_slice_mut(&mut self) -> &mut [usize] {
+        let mut size = 0;
+        let mut ptr = std::ptr::null_mut();
+        unsafe {
+            sys::std_vector_size_t_size(self.0, &mut size);
+            sys::std_vector_size_t_data(self.0, &mut ptr);
+            std::slice::from_raw_parts_mut(ptr, size as usize)
+        }
+    }
+}
+
+impl Default for CppVectorSize {
+    fn default() -> Self {
+        CppVectorSize::new()
     }
 }

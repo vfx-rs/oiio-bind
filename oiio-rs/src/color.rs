@@ -21,6 +21,20 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 ///
 pub struct ColorProcessor(pub(crate) *mut sys::std_ColorProcessorHandle_t);
 
+impl ColorProcessor {
+    /// Get the raw pointer from the shared pointer
+    ///
+    pub fn get_raw_ptr(&self) -> *const sys::OIIO_ColorProcessor_t {
+        let mut ptr = std::ptr::null_mut();
+        unsafe {
+            sys::std_ColorProcessorHandle_get(self.0, &mut ptr);
+        }
+
+        ptr
+    }
+
+}
+
 impl Drop for ColorProcessor {
     fn drop(&mut self) {
         unsafe {

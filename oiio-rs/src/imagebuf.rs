@@ -130,6 +130,16 @@ impl ImageBuf {
         }
     }
 
+    /// Is there an error logged against this ImageBuf?
+    ///
+    pub fn has_error(&self) -> bool {
+        let mut result = false;
+        unsafe {
+            sys::OIIO_ImageBuf_has_error(self.ptr, &mut result);
+        }
+        result
+    }
+
     /// Construct a read-only ImageBuf that will be used to read the named
     /// file (at the given subimage and MIP-level, defaulting to the first
     /// in the file).  But don't read it yet!  The image will actually be

@@ -515,7 +515,6 @@ CPPMM_RENAME(rangeexpand_in)
 auto rangeexpand(OIIO::ImageBuf& dst, const OIIO::ImageBuf& src, bool useluma,
                  OIIO::ROI roi, int nthreads) -> bool;
 
-/*
 struct PixelStats {
     using BoundType = OIIO::ImageBufAlgo::PixelStats;
 
@@ -535,20 +534,20 @@ struct PixelStats {
     CPPMM_IGNORE
     PixelStats(const OIIO::ImageBufAlgo::PixelStats&);
     ~PixelStats();
-} CPPMM_OPAQUEBYTES; // struct PixelStats
+} CPPMM_OPAQUEPTR CPPMM_PROPERTIES(min; max; avg; stddev; nancount; infcount; finitecount; sum; sum2); // struct PixelStats
 
 auto computePixelStats(const OIIO::ImageBuf& src, OIIO::ROI roi, int nthreads)
     -> OIIO::ImageBufAlgo::PixelStats;
 
+CPPMM_IGNORE
 auto computePixelStats(OIIO::ImageBufAlgo::PixelStats& stats,
                        const OIIO::ImageBuf& src, OIIO::ROI roi, int nthreads)
     -> bool;
-    */
 
 struct CompareResults {
     using BoundType = OIIO::ImageBufAlgo::CompareResults;
 
-} CPPMM_VALUETYPE; // struct CompareResults
+} CPPMM_VALUETYPE CPPMM_DERIVE("Default, Copy, Clone, PartialEq, PartialOrd"); // struct CompareResults
 
 auto compare(const OIIO::ImageBuf& A, const OIIO::ImageBuf& B, float failthresh,
              float warnthresh, OIIO::ROI roi, int nthreads)
@@ -604,7 +603,7 @@ auto computePixelHashSHA1(const OIIO::ImageBuf& src,
 
 auto histogram(const OIIO::ImageBuf& src, int channel, int bins, float min,
                float max, bool ignore_empty, OIIO::ROI roi, int nthreads)
-    -> std::vector<size_t, std::allocator<size_t>>;
+    -> std::vector<size_t>;
 
 CPPMM_IGNORE
 auto histogram(
@@ -674,7 +673,7 @@ enum NonFiniteFixMode {
     NONFINITE_BLACK = 1,
     NONFINITE_BOX3 = 2,
     NONFINITE_ERROR = 100,
-};
+} CPPMM_RUSTIFY_ENUM CPPMM_ENUM_PREFIX(NONFINITE_);
 
 auto fixNonFinite(const OIIO::ImageBuf& src,
                   OIIO::ImageBufAlgo::NonFiniteFixMode mode, int* pixelsFixed,
