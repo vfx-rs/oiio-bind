@@ -18,8 +18,10 @@ RUN sed -Ei 's/^# deb-src /deb-src /' /etc/apt/sources.list && \
     libssl-dev \
     libtiff-dev \
     pybind11-dev \
+    python2-dev \
     libboost-all-dev && \
-    DEBIAN_FRONTEND="noninteractive" apt build-dep -y cmake
+    DEBIAN_FRONTEND="noninteractive" apt build-dep -y cmake && \
+    ln -s $(which python2) /usr/bin/python
 
 # Install Rust
 ENV RUSTUP_HOME=/usr/local/rustup \
@@ -49,7 +51,7 @@ RUN mkdir -p /tmp/cmake && \
 # Compile OpenEXR
 RUN mkdir -p /tmp/openexr && \
     cd /tmp/openexr && \
-    curl -L https://github.com/OpenImageIO/oiio/archive/refs/tags/v3.0.1.tar.gz | tar -xvz && \
+    curl -L https://github.com/AcademySoftwareFoundation/openexr/archive/refs/tags/v3.0.1.tar.gz | tar -xvz && \
     cd openexr-3.0.1 && \
     mkdir build && \
     cd build && \
