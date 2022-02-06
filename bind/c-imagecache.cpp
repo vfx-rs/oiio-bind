@@ -1,4 +1,5 @@
 #include <OpenImageIO/imagecache.h>
+#include <OpenImageIO/imagebuf.h>
 #include <cppmm_bind.hpp>
 
 namespace cppmm_bind {
