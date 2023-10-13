@@ -1,6 +1,8 @@
+use anyhow::Result;
+
 const NAMES: &[&str] = &["typedesc", "imageio", "deepdata", "filesystem"];
 
-fn main() {
+fn main() -> Result<()> {
     cxx_build::bridges(NAMES.iter().map(|s| format!("src/{}.rs", s)))
         .files(NAMES.iter().map(|s| format!("src/ffi_{}.cpp", s)))
         .flag_if_supported("-std=c++17")
@@ -16,4 +18,6 @@ fn main() {
         println!("cargo:rerun-if-changed=src/ffi_{}.cpp", name);
         println!("cargo:rerun-if-changed=include/ffi_{}.h", name);
     }
+
+    Ok(())
 }
