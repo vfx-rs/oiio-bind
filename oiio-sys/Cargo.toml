@@ -11,3 +11,8 @@ cxx = "1.0.107"
 [build-dependencies]
 anyhow = "1.0"
 cxx-build = "1.0.107"
+
+# The docs are the same across all platforms so we only need to build once.
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+rustc-args = ["--cfg", "docsrs"]

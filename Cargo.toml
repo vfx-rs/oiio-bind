@@ -7,3 +7,8 @@ edition = "2021"
 
 [dependencies]
 oiio-sys = { path = "oiio-sys" }
+
+# The docs are the same across all platforms so we only need to build once.
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+rustc-args = ["--cfg", "docsrs"]
