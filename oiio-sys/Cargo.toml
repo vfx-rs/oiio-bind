@@ -2,6 +2,7 @@
 name = "oiio-sys"
 version = "0.1.0"
 edition = "2021"
+links = "OpenImageIO"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -11,6 +12,7 @@ cxx = "1.0.107"
 [build-dependencies]
 anyhow = "1.0"
 cxx-build = "1.0.107"
+pkg-config = "0.3.27"
 
 # The docs are the same across all platforms so we only need to build once.
 [package.metadata.docs.rs]
