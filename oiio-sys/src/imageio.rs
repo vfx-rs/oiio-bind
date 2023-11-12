@@ -33,6 +33,7 @@ mod ffi {
 
         // ROI
         pub fn roi_default() -> ROI;
+        #[allow(clippy::too_many_arguments)]
         pub fn roi_new(
             xbegin: i32,
             xend: i32,
@@ -142,6 +143,7 @@ mod ffi {
             data: &mut [u8],
             xstride: i64,
         ) -> bool;
+        #[allow(clippy::too_many_arguments)]
         pub fn imageinput_read_scanlines(
             imageinput: Pin<&mut ImageInput>,
             subimage: i32,
@@ -156,6 +158,7 @@ mod ffi {
             xstride: i64,
             ystride: i64,
         ) -> bool;
+        #[allow(clippy::too_many_arguments)]
         pub fn imageinput_read_image(
             imageinput: Pin<&mut ImageInput>,
             subimage: i32,
@@ -168,6 +171,7 @@ mod ffi {
             ystride: i64,
             zstride: i64,
         ) -> bool;
+        #[allow(clippy::too_many_arguments)]
         pub fn imageinput_read_native_deep_scanlines(
             imageinput: Pin<&mut ImageInput>,
             subimage: i32,
@@ -179,6 +183,7 @@ mod ffi {
             chend: i32,
             data: Pin<&mut DeepData>,
         ) -> bool;
+        #[allow(clippy::too_many_arguments)]
         pub fn imageinput_read_native_deep_tiles(
             imageinput: Pin<&mut ImageInput>,
             subimage: i32,
@@ -208,6 +213,7 @@ mod ffi {
             data: &mut [u8],
         ) -> bool;
 
+        #[allow(clippy::too_many_arguments)]
         pub fn imageinput_read_native_scanlines(
             imageinput: Pin<&mut ImageInput>,
             subimage: i32,
@@ -230,6 +236,7 @@ mod ffi {
             data: &mut [u8],
         ) -> bool;
 
+        #[allow(clippy::too_many_arguments)]
         pub fn imageinput_read_native_tiles(
             imageinput: Pin<&mut ImageInput>,
             xbegin: i32,
@@ -243,6 +250,7 @@ mod ffi {
             data: &mut [u8],
         ) -> bool;
 
+        /// Safety: must be called with a valid ioproxy pointer.
         pub unsafe fn imageinput_set_ioproxy(
             imageinput: Pin<&mut ImageInput>,
             ioproxy: *mut IOProxy,
