@@ -6,6 +6,19 @@
 #include <stdio.h>
 
 namespace oiio {
+#pragma region Utility
+bool
+has_error()
+{
+    return OIIO::has_error();
+}
+
+rust::String
+get_error(bool clear) {
+    return OIIO::geterror(clear);
+}
+#pragma endregion
+
 #pragma region ROI
 ROI
 roi_default() noexcept
@@ -250,11 +263,7 @@ imageinput_open_without_config(const rust::Str filename)
     std::unique_ptr<OIIO::ImageInput> image_input(
         OIIO::ImageInput::open(std::string(filename), nullptr));
 
-    if (image_input) {
-        return image_input;
-    } else {
-        throw std::runtime_error(OIIO::geterror());
-    }
+    return image_input;
 }
 
 std::unique_ptr<ImageSpec>
