@@ -6,6 +6,19 @@
 #include <stdio.h>
 
 namespace oiio {
+#pragma region Utility
+bool
+has_error()
+{
+    return OIIO::has_error();
+}
+
+rust::String
+get_error(bool clear) {
+    return OIIO::geterror(clear);
+}
+#pragma endregion
+
 #pragma region ROI
 ROI
 roi_default() noexcept

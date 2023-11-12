@@ -27,6 +27,10 @@ mod ffi {
         type ROI = crate::imageio::ROI;
         type TypeDesc = crate::typedesc::TypeDesc;
 
+        /// Utility
+        pub fn has_error() -> bool;
+        pub fn get_error(clear: bool) -> String;
+
         // ROI
         pub fn roi_default() -> ROI;
         pub fn roi_new(

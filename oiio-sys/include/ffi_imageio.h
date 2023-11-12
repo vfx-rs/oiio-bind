@@ -20,6 +20,14 @@ using IOProxy    = OIIO::Filesystem::IOProxy;
 using ROI        = OIIO::ROI;
 using TypeDesc   = OIIO::TypeDesc;
 
+#pragma region Utility
+bool
+has_error();
+
+rust::String
+get_error(bool clear);
+#pragma endregion
+
 #pragma region ROI
 
 ROI
