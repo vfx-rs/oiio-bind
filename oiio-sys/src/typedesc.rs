@@ -43,7 +43,7 @@ mod ffi {
     }
 
     unsafe extern "C++" {
-        include!("oiio-sys/include/ffi_typedesc.h");
+        include!("oiio-sys/src/ffi_typedesc.h");
 
         // TypeDesc
         pub type TypeDesc;

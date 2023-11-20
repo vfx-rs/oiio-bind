@@ -36,7 +36,7 @@ mod ffi {
     }
 
     unsafe extern "C++" {
-        include!("oiio-sys/include/ffi_imageio.h");
+        include!("oiio-sys/src/ffi_imageio.h");
 
         type DeepData = crate::deepdata::DeepData;
         type IOProxy = crate::filesystem::IOProxy;
