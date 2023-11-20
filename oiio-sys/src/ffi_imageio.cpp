@@ -1,4 +1,4 @@
-#include "oiio-sys/include/ffi_imageio.h"
+#include "ffi_imageio.h"
 #include <OpenImageIO/imageio.h>
 #include <OpenImageIO/string_view.h>
 #include <memory>
