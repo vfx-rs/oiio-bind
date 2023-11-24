@@ -1,14 +1,5 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+/// Low-level oiio-sys FFI bindings to OpenImageIO.
+use oiio_sys as sys;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+mod imageio;
+pub use imageio::ImageInput;
