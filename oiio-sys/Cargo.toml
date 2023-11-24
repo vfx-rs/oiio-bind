@@ -17,12 +17,12 @@ repository = "https://github.com/vfx-rs/oiio-bind.git"
 links = "OpenImageIO"
 
 [dependencies]
-cxx = "1.0.115"
+cxx = { workspace = true }
 
 [build-dependencies]
-anyhow = "1.0.79"
-cxx-build = "1.0.115"
-pkg-config = "0.3.28"
+anyhow = { workspace = true }
+cxx-build = "1.0.116"
+pkg-config = "0.3.29"
 
 # The docs are the same across all platforms so we only need to build once.
 [package.metadata.docs.rs]
