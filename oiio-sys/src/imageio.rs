@@ -128,8 +128,8 @@ mod ffi {
             imageinput: Pin<&mut ImageInput>,
             subimage: i32,
             miplevel: i32,
-        ) -> &ImageSpec;
-        pub fn imageinput_close(imageinput: Pin<&mut ImageInput>) -> Result<()>;
+        ) -> UniquePtr<ImageSpec>;
+        pub fn imageinput_close(imageinput: Pin<&mut ImageInput>) -> bool;
         pub fn imageinput_current_subimage(imageinput: &ImageInput) -> i32;
         pub fn imageinput_current_miplevel(imageinput: &ImageInput) -> i32;
         pub fn imageinput_seek_subimage(

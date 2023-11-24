@@ -182,7 +182,7 @@ const ImageSpec&
 imageinput_spec_dimensions(ImageInput& imageinput, int32_t subimage,
                            int32_t miplevel);
 
-void
+bool
 imageinput_close(ImageInput& imageinput);
 
 int

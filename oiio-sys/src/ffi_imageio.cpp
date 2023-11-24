@@ -342,12 +342,10 @@ imageinput_spec_dimensions(OIIO::ImageInput& imageinput, int32_t subimage,
     return imageinput.spec_dimensions(subimage, miplevel);
 }
 
-void
+bool
 imageinput_close(ImageInput& imageinput)
 {
-    if (!imageinput.close()) {
-        throw std::runtime_error(imageinput.geterror());
-    }
+    return imageinput.close();
 }
 
 int
