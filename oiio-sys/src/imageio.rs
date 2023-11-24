@@ -252,7 +252,9 @@ mod ffi {
             data: &mut [u8],
         ) -> bool;
 
-        /// Safety: must be called with a valid ioproxy pointer.
+        /// Set the IO proxy for this ImageInput.
+        /// # Safety
+        /// Must be called with a valid ioproxy pointer.
         pub unsafe fn imageinput_set_ioproxy(
             imageinput: Pin<&mut ImageInput>,
             ioproxy: *mut IOProxy,
