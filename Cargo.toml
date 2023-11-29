@@ -15,11 +15,18 @@ repository = "https://github.com/vfx-rs/oiio-bind.git"
 [workspace]
 members = ["oiio-sys"]
 
+[workspace.dependencies]
+anyhow = "1.0"
+cxx = { version = "1.0", features = ["c++17"] }
+thiserror = "1.0"
+
 [dependencies]
+anyhow = { workspace = true }
+cxx = { workspace = true }
 oiio-sys = { path = "oiio-sys", version = "0.2.0-beta0" }
+thiserror = { workspace = true }
 
 [dev-dependencies]
-anyhow = "1.0"
 
 # The docs are the same across all platforms so we only need to build once.
 [package.metadata.docs.rs]

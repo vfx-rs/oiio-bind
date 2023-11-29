@@ -14,10 +14,10 @@ repository = "https://github.com/vfx-rs/oiio-bind.git"
 links = "OpenImageIO"
 
 [dependencies]
-cxx = "1.0.107"
+cxx = { workspace = true }
 
 [build-dependencies]
-anyhow = "1.0"
+anyhow = { workspace = true }
 cxx-build = "1.0.107"
 pkg-config = "0.3.27"
 

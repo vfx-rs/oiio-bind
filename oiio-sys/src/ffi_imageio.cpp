@@ -1,4 +1,4 @@
-#include "oiio-sys/include/ffi_imageio.h"
+#include "ffi_imageio.h"
 #include <OpenImageIO/imageio.h>
 #include <OpenImageIO/string_view.h>
 #include <memory>
@@ -386,12 +386,10 @@ imageinput_spec_dimensions(OIIO::ImageInput& imageinput, int32_t subimage,
     return std::unique_ptr<ImageSpec>(new ImageSpec(spec));
 }
 
-void
+bool
 imageinput_close(ImageInput& imageinput)
 {
-    if (!imageinput.close()) {
-        throw std::runtime_error(imageinput.geterror());
-    }
+    return imageinput.close();
 }
 
 int

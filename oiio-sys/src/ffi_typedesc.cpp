@@ -1,4 +1,4 @@
-#include "oiio-sys/include/ffi_typedesc.h"
+#include "ffi_typedesc.h"
 #include "rust/cxx.h"
 #include <OpenImageIO/string_view.h>
 #include <OpenImageIO/typedesc.h>
