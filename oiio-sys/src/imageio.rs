@@ -17,8 +17,24 @@ unsafe impl cxx::ExternType for ROI {
     type Kind = cxx::kind::Trivial;
 }
 
+pub enum OpenMode {
+    Create,
+    AppendSubimage,
+    AppendMIPLevel,
+}
+
+unsafe impl cxx::ExternType for OpenMode {
+    type Id = cxx::type_id!("oiio::OpenMode");
+    type Kind = cxx::kind::Trivial;
+}
+
 #[cxx::bridge(namespace = oiio)]
 mod ffi {
+    struct ExtensionMapItem {
+        key: String,
+        value: Vec<String>,
+    }
+
     unsafe extern "C++" {
         include!("oiio-sys/include/ffi_imageio.h");
 
@@ -26,10 +42,6 @@ mod ffi {
         type IOProxy = crate::filesystem::IOProxy;
         type ROI = crate::imageio::ROI;
         type TypeDesc = crate::typedesc::TypeDesc;
-
-        /// Utility
-        pub fn has_error() -> bool;
-        pub fn get_error(clear: bool) -> String;
 
         // ROI
         pub fn roi_default() -> ROI;
@@ -92,15 +104,6 @@ mod ffi {
             config: &ImageSpec,
         ) -> Result<UniquePtr<ImageInput>>;
         pub fn imageinput_open_without_config(filename: &str) -> Result<UniquePtr<ImageInput>>;
-        pub fn imageinput_open_newspec_with_config(
-            imageinput: Pin<&mut ImageInput>,
-            filename: &str,
-            config: &ImageSpec,
-        ) -> Result<UniquePtr<ImageSpec>>;
-        pub fn imageinput_open_newspec_without_config(
-            imageinput: Pin<&mut ImageInput>,
-            filename: &str,
-        ) -> Result<UniquePtr<ImageSpec>>;
         pub fn imageinput_create_with_config(
             filename: &str,
             do_open: bool,
@@ -115,18 +118,17 @@ mod ffi {
         pub fn imageinput_format_name(imageinput: &ImageInput) -> &str;
         pub fn imageinput_supports(imageinput: &ImageInput, feature: &str) -> bool;
         pub fn imageinput_valid_file(imageinput: &ImageInput, filename: &str) -> bool;
-        pub fn imageinput_geterror(imageinput: Pin<&mut ImageInput>) -> String;
-        pub fn imageinput_spec(imageinput: &ImageInput) -> UniquePtr<ImageSpec>;
+        pub fn imageinput_spec(imageinput: &ImageInput) -> &ImageSpec;
         pub fn imageinput_spec_subimage_miplevel(
             imageinput: Pin<&mut ImageInput>,
             subimage: i32,
             miplevel: i32,
-        ) -> UniquePtr<ImageSpec>;
+        ) -> &ImageSpec;
         pub fn imageinput_spec_dimensions(
             imageinput: Pin<&mut ImageInput>,
             subimage: i32,
             miplevel: i32,
-        ) -> UniquePtr<ImageSpec>;
+        ) -> &ImageSpec;
         pub fn imageinput_close(imageinput: Pin<&mut ImageInput>) -> Result<()>;
         pub fn imageinput_current_subimage(imageinput: &ImageInput) -> i32;
         pub fn imageinput_current_miplevel(imageinput: &ImageInput) -> i32;
@@ -258,8 +260,49 @@ mod ffi {
 
         pub fn imageinput_has_error(imageinput: &ImageInput) -> bool;
 
+        pub fn imageinput_geterror(imageinput: Pin<&mut ImageInput>) -> String;
+
+        pub fn imageinput_seterror(imageinput: Pin<&mut ImageInput>, message: &str);
+
         pub fn imageinput_set_threads(imageinput: Pin<&mut ImageInput>, n: i32);
 
         pub fn imageinput_threads(imageinput: &ImageInput) -> i32;
+
+        // ImageOutput
+        type OpenMode = crate::imageio::OpenMode;
+
+        pub type ImageOutput;
+
+        /// Safety: must be called with a valid ioproxy pointer.
+        pub unsafe fn imageoutput_create(
+            filename: &str,
+            ioproxy: *mut IOProxy,
+            plugin_searchpath: &str,
+        ) -> UniquePtr<ImageOutput>;
+
+        pub fn imageoutput_format_name(imageoutput: &ImageOutput) -> &str;
+
+        pub fn imageoutput_supports(imageoutput: &ImageOutput, feature: &str) -> i32;
+
+        pub fn imageoutput_open(
+            imageoutput: Pin<&mut ImageOutput>,
+            filename: &str,
+            newspec: &ImageSpec,
+            mode: OpenMode,
+        ) -> bool;
+
+        /// Safety: must be called with a valid specs pointer. The subimages
+        /// must be less than or equal to the number of subimages in the specs.
+        pub unsafe fn imageoutput_open_multi_subimage(
+            imageoutput: Pin<&mut ImageOutput>,
+            filename: &str,
+            subimages: i32,
+            specs: *const ImageSpec,
+        ) -> bool;
+
+        pub fn imageoutput_spec(imageoutput: &ImageOutput) -> &ImageSpec;
+
+        pub fn imageoutput_close(imageoutput: Pin<&mut ImageOutput>) -> bool;
+
     }
 }
