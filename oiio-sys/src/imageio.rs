@@ -306,5 +306,8 @@ mod ffi {
 
         pub fn imageoutput_close(imageoutput: Pin<&mut ImageOutput>) -> bool;
 
+        pub fn has_error() -> bool;
+
+        pub fn get_error(clear: bool) -> String;
     }
 }
