@@ -367,9 +367,8 @@ imageinput_seek_subimage(ImageInput& imageinput, int subimage, int miplevel)
 }
 
 bool
-imageinput_read_scanline(ImageInput& imageinput, int y, int z,
-                         const TypeDesc& format, rust::Slice<uint8_t> data,
-                         int64_t xstride)
+imageinput_read_scanline(ImageInput& imageinput, int y, int z, TypeDesc format,
+                         rust::Slice<uint8_t> data, int64_t xstride)
 {
     return imageinput.read_scanline(y, z, format, data.data(), xstride);
 }
@@ -377,7 +376,7 @@ imageinput_read_scanline(ImageInput& imageinput, int y, int z,
 bool
 imageinput_read_scanlines(ImageInput& imageinput, int subimage, int miplevel,
                           int ybegin, int yend, int z, int chbegin, int chend,
-                          const TypeDesc& format, rust::Slice<uint8_t> data,
+                          TypeDesc format, rust::Slice<uint8_t> data,
                           int64_t xstride, int64_t ystride)
 {
     return imageinput.read_scanlines(subimage, miplevel, ybegin, yend, z,
@@ -387,7 +386,7 @@ imageinput_read_scanlines(ImageInput& imageinput, int subimage, int miplevel,
 
 bool
 imageinput_read_image(ImageInput& imageinput, int subimage, int miplevel,
-                      int chbegin, int chend, const TypeDesc& format,
+                      int chbegin, int chend, TypeDesc format,
                       rust::Slice<uint8_t> data, int64_t xstride,
                       int64_t ystride, int64_t zstride)
 {
@@ -544,15 +543,15 @@ imageoutput_close(ImageOutput& imageoutput)
 
 bool
 imageoutput_write_scanline(ImageOutput& imageoutput, int y, int z,
-                           const TypeDesc& format,
-                           const rust::Slice<uint8_t> data, int64_t xstride)
+                           TypeDesc format, const rust::Slice<uint8_t> data,
+                           int64_t xstride)
 {
     return imageoutput.write_scanline(y, z, format, data.data(), xstride);
 }
 
 bool
 imageoutput_write_scanlines(ImageOutput& imageoutput, int ybegin, int yend,
-                            int z, const TypeDesc& format,
+                            int z, TypeDesc format,
                             const rust::Slice<uint8_t> data, int64_t xstride,
                             int64_t ystride)
 {
@@ -562,7 +561,7 @@ imageoutput_write_scanlines(ImageOutput& imageoutput, int ybegin, int yend,
 
 bool
 imageoutput_write_tile(ImageOutput& imageoutput, int x, int y, int z,
-                       const TypeDesc& format, const rust::Slice<uint8_t> data,
+                       TypeDesc format, const rust::Slice<uint8_t> data,
                        int64_t xstride, int64_t ystride, int64_t zstride)
 {
     return imageoutput.write_tile(x, y, z, format, data.data(), xstride,
@@ -572,7 +571,7 @@ imageoutput_write_tile(ImageOutput& imageoutput, int x, int y, int z,
 bool
 imageoutput_write_tiles(ImageOutput& imageoutput, int xbegin, int xend,
                         int ybegin, int yend, int zbegin, int zend,
-                        const TypeDesc& format, const rust::Slice<uint8_t> data,
+                        TypeDesc format, const rust::Slice<uint8_t> data,
                         int64_t xstride, int64_t ystride, int64_t zstride)
 {
     return imageoutput.write_tiles(xbegin, xend, ybegin, yend, zbegin, zend,
@@ -583,9 +582,8 @@ imageoutput_write_tiles(ImageOutput& imageoutput, int xbegin, int xend,
 bool
 imageoutput_write_rectangle(ImageOutput& imageoutput, int xbegin, int xend,
                             int ybegin, int yend, int zbegin, int zend,
-                            const TypeDesc& format,
-                            const rust::Slice<uint8_t> data, int64_t xstride,
-                            int64_t ystride, int64_t zstride)
+                            TypeDesc format, const rust::Slice<uint8_t> data,
+                            int64_t xstride, int64_t ystride, int64_t zstride)
 {
     return imageoutput.write_rectangle(xbegin, xend, ybegin, yend, zbegin, zend,
                                        format, data.data(), xstride, ystride,
@@ -593,7 +591,7 @@ imageoutput_write_rectangle(ImageOutput& imageoutput, int xbegin, int xend,
 }
 
 bool
-imageoutput_write_image(ImageOutput& imageoutput, const TypeDesc& format,
+imageoutput_write_image(ImageOutput& imageoutput, TypeDesc format,
                         const rust::Slice<uint8_t> data, int64_t xstride,
                         int64_t ystride, int64_t zstride)
 {
@@ -698,7 +696,7 @@ get_error(bool clear)
 }
 
 bool
-attribute(const rust::Str name, TypeDesc type, const rust::Slice<uint8_t> value)
+attribute(const rust::Str name, TypeDesc type, rust::Slice<uint8_t> value)
 {
     return OIIO::attribute(std::string_view(name.data(), name.length()), type,
                            value.data());
@@ -717,7 +715,8 @@ attribute_int(const rust::Str name, const int value)
 }
 
 bool
-getattribute(const rust::Str name, TypeDesc type, rust::Slice<uint8_t> value)
+getattribute(const rust::Str name, const TypeDesc type,
+             rust::Slice<uint8_t> value)
 {
     return OIIO::getattribute(std::string_view(name.data(), name.length()),
                               type, value.data());
@@ -765,21 +764,50 @@ get_float_attribute(const rust::Str name, float defaultval)
                                      defaultval);
 }
 
-rust::Str
-getattribute_string(const rust::Str name, const rust::Str defaultval)
+rust::String
+get_string_attribute(const rust::Str name, const rust::Str defaultval)
 {
     std::string c_defaultval(defaultval.data(), defaultval.length());
     std::string c_value = OIIO::get_string_attribute(
         std::string_view(name.data(), name.length()), c_defaultval);
-    return rust::Str(c_value);
+    return rust::String(c_value);
 }
 
 // void
-// declare_imageio_format(const rust::Str name, ImageInput::Creator input_creator,
-//                        const rust::Slice<rust::Str> input_extensions,
-//                        ImageOutput::Creator output_creator,
-//                        const rust::Slice<rust::Str> output_extensions,
-//                        const rust::Str lib_version);
+// declare_imageio_format(const rust::Str name,
+//                        rust::Fn<ImageInput*(ImageInput*)> input_creator,
+//                        const rust::Slice<const rust::Str> input_extensions,
+//                        rust::Fn<ImageOutput*(ImageOutput*)> output_creator,
+//                        const rust::Slice<const rust::Str> output_extensions,
+//                        const rust::Str lib_version)
+// {
+//     auto c_input_creator = [&](OIIO::ImageInput*) -> OIIO::ImageInput* {
+//         return input_creator();
+//     };
+
+//     std::vector<const char*> c_input_extensions;
+//     c_input_extensions.reserve(input_extensions.size() + 1);
+//     std::vector<const char*> c_output_extensions;
+//     c_output_extensions.reserve(output_extensions.size() + 1);
+//     std::string c_name(name.data(), name.length());
+//     std::string c_lib_version(lib_version.data(), lib_version.length());
+
+//     for (auto& ext : input_extensions) {
+//         c_input_extensions.push_back(ext.data());
+//     }
+//     c_input_extensions.push_back(nullptr);
+
+//     for (auto& ext : output_extensions) {
+//         c_output_extensions.push_back(ext.data());
+//     }
+//     c_output_extensions.push_back(nullptr);
+
+//     OIIO::declare_imageio_format(c_name, c_input_creator,
+//                                  c_input_extensions.data(),
+//                                  (ImageOutput::Creator)(&output_creator),
+//                                  c_output_extensions.data(),
+//                                  c_lib_version.data());
+// }
 
 bool
 is_imageio_format_name(const rust::Str name)
@@ -811,7 +839,7 @@ get_extension_map()
 
 
 bool
-convert_pixel_values(TypeDesc src_type, const rust::Slice<uint8_t> src,
+convert_pixel_values(TypeDesc src_type, rust::Slice<const uint8_t> src,
                      TypeDesc dst_type, rust::Slice<uint8_t> dst)
 {
     return OIIO::convert_pixel_values(src_type, src.data(), dst_type,
@@ -820,7 +848,7 @@ convert_pixel_values(TypeDesc src_type, const rust::Slice<uint8_t> src,
 
 bool
 convert_image(int nchannels, int width, int height, int depth,
-              const rust::Slice<uint8_t> src, TypeDesc src_type,
+              rust::Slice<const uint8_t> src, TypeDesc src_type,
               int64_t src_xstride, int64_t src_ystride, int64_t src_zstride,
               rust::Slice<uint8_t> dst, TypeDesc dst_type, int64_t dst_xstride,
               int64_t dst_ystride, int64_t dst_zstride)
@@ -833,7 +861,7 @@ convert_image(int nchannels, int width, int height, int depth,
 
 bool
 parallel_convert_image(int nchannels, int width, int height, int depth,
-                       const rust::Slice<uint8_t> src, TypeDesc src_type,
+                       rust::Slice<const uint8_t> src, TypeDesc src_type,
                        int64_t src_xstride, int64_t src_ystride,
                        int64_t src_zstride, rust::Slice<uint8_t> dst,
                        TypeDesc dst_type, int64_t dst_xstride,
@@ -860,7 +888,7 @@ add_dither(int nchannels, int width, int height, int depth, float* data,
 
 void
 premult(int nchannels, int width, int height, int depth, int chbegin, int chend,
-        TypeDesc datatype, const rust::Slice<uint8_t> data, int64_t xstride,
+        TypeDesc datatype, rust::Slice<uint8_t> data, int64_t xstride,
         int64_t ystride, int64_t zstride, int alpha_channel, int z_channel)
 {
     OIIO::premult(nchannels, width, height, depth, chbegin, chend, datatype,
@@ -870,7 +898,7 @@ premult(int nchannels, int width, int height, int depth, int chbegin, int chend,
 
 bool
 copy_image(int nchannels, int width, int height, int depth,
-           const rust::Slice<uint8_t> src, int64_t pixelsize,
+           rust::Slice<const uint8_t> src, int64_t pixelsize,
            int64_t src_xstride, int64_t src_ystride, int64_t src_zstride,
            rust::Slice<uint8_t> dst, int64_t dst_xstride, int64_t dst_ystride,
            int64_t dst_zstride)

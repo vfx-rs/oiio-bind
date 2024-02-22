@@ -195,31 +195,30 @@ bool
 imageinput_seek_subimage(ImageInput& imageinput, int subimage, int miplevel);
 
 bool
-imageinput_read_scanline(ImageInput& imageinput, int y, int z,
-                         const TypeDesc& format, rust::Slice<uint8_t> data,
-                         int64_t xstride);
+imageinput_read_scanline(ImageInput& imageinput, int y, int z, TypeDesc format,
+                         rust::Slice<uint8_t> data, int64_t xstride);
 
 bool
 imageinput_read_scanlines(ImageInput& imageinput, int subimage, int miplevel,
                           int ybegin, int yend, int z, int chbegin, int chend,
-                          const TypeDesc& format, rust::Slice<uint8_t> data,
+                          TypeDesc format, rust::Slice<uint8_t> data,
                           int64_t xstride, int64_t ystride);
 
 bool
 imageinput_read_tile(ImageInput& imageinput, int x, int y, int z,
-                     const TypeDesc& format, rust::Slice<uint8_t> data,
+                     TypeDesc format, rust::Slice<uint8_t> data,
                      int64_t xstride, int64_t ystride, int64_t zstride);
 
 bool
 imageinput_read_scanlines(ImageInput& imageinput, int subimage, int miplevel,
                           int ybegin, int yend, int zbegin, int zend,
-                          int chbegin, int chend, const TypeDesc& format,
+                          int chbegin, int chend, TypeDesc format,
                           rust::Slice<uint8_t> data, int64_t xstride,
                           int64_t ystride, int64_t zstride);
 
 bool
 imageinput_read_image(ImageInput& imageinput, int subimage, int miplevel,
-                      int chbegin, int chend, const TypeDesc& format,
+                      int chbegin, int chend, TypeDesc format,
                       rust::Slice<uint8_t> data, int64_t xstride,
                       int64_t ystride, int64_t zstride);
 
@@ -305,35 +304,34 @@ imageoutput_close(ImageOutput& imageoutput);
 
 bool
 imageoutput_write_scanline(ImageOutput& imageoutput, int y, int z,
-                           const TypeDesc& format,
-                           const rust::Slice<uint8_t> data, int64_t xstride);
+                           TypeDesc format, const rust::Slice<uint8_t> data,
+                           int64_t xstride);
 
 bool
 imageoutput_write_scanlines(ImageOutput& imageoutput, int ybegin, int yend,
-                            int z, const TypeDesc& format,
+                            int z, TypeDesc format,
                             const rust::Slice<uint8_t> data, int64_t xstride,
                             int64_t ystride);
 
 bool
 imageoutput_write_tile(ImageOutput& imageoutput, int x, int y, int z,
-                       const TypeDesc& format, const rust::Slice<uint8_t> data,
+                       TypeDesc format, const rust::Slice<uint8_t> data,
                        int64_t xstride, int64_t ystride, int64_t zstride);
 
 bool
 imageoutput_write_tiles(ImageOutput& imageoutput, int xbegin, int xend,
                         int ybegin, int yend, int zbegin, int zend,
-                        const TypeDesc& format, const rust::Slice<uint8_t> data,
+                        TypeDesc format, const rust::Slice<uint8_t> data,
                         int64_t xstride, int64_t ystride, int64_t zstride);
 
 bool
 imageoutput_write_rectangle(ImageOutput& imageoutput, int xbegin, int xend,
                             int ybegin, int yend, int zbegin, int zend,
-                            const TypeDesc& format,
-                            const rust::Slice<uint8_t> data, int64_t xstride,
-                            int64_t ystride, int64_t zstride);
+                            TypeDesc format, const rust::Slice<uint8_t> data,
+                            int64_t xstride, int64_t ystride, int64_t zstride);
 
 bool
-imageoutput_write_image(ImageOutput& imageoutput, const TypeDesc& format,
+imageoutput_write_image(ImageOutput& imageoutput, TypeDesc format,
                         const rust::Slice<uint8_t> data, int64_t xstride,
                         int64_t ystride, int64_t zstride);
 
@@ -389,8 +387,7 @@ rust::String
 get_error(bool clear);
 
 bool
-attribute(const rust::Str name, TypeDesc type,
-          const rust::Slice<uint8_t> value);
+attribute(const rust::Str name, TypeDesc type, rust::Slice<uint8_t> value);
 
 bool
 attribute_float(const rust::Str name, float value);
@@ -416,15 +413,16 @@ get_int_attribute(const rust::Str name, int defaultval);
 float
 get_float_attribute(const rust::Str name, float defaultval);
 
-rust::Str
-getattribute_string(const rust::Str name, const rust::Str defaultval);
+rust::String
+get_string_attribute(const rust::Str name, const rust::Str defaultval);
 
-void
-declare_imageio_format(const rust::Str name, ImageInput::Creator input_creator,
-                       const rust::Slice<rust::Str> input_extensions,
-                       ImageOutput::Creator output_creator,
-                       const rust::Slice<rust::Str> output_extensions,
-                       const rust::Str lib_version);
+// void
+// declare_imageio_format(const rust::Str name,
+//                        rust::Fn<ImageInput*(ImageInput*)> input_creator,
+//                        const rust::Slice<const rust::Str> input_extensions,
+//                        rust::Fn<ImageOutput*(ImageOutput*)> output_creator,
+//                        const rust::Slice<const rust::Str> output_extensions,
+//                        const rust::Str lib_version);
 
 bool
 is_imageio_format_name(const rust::Str name);
@@ -433,19 +431,19 @@ rust::Vec<ExtensionMapItem>
 get_extension_map();
 
 bool
-convert_pixel_values(TypeDesc src_type, const rust::Slice<uint8_t> src,
+convert_pixel_values(TypeDesc src_type, rust::Slice<const uint8_t> src,
                      TypeDesc dst_type, rust::Slice<uint8_t> dst);
 
 bool
 convert_image(int nchannels, int width, int height, int depth,
-              const rust::Slice<uint8_t> src, TypeDesc src_type,
+              rust::Slice<const uint8_t> src, TypeDesc src_type,
               int64_t src_xstride, int64_t src_ystride, int64_t src_zstride,
               rust::Slice<uint8_t> dst, TypeDesc dst_type, int64_t dst_xstride,
               int64_t dst_ystride, int64_t dst_zstride);
 
 bool
 parallel_convert_image(int nchannels, int width, int height, int depth,
-                       const rust::Slice<uint8_t> src, TypeDesc src_type,
+                       rust::Slice<const uint8_t> src, TypeDesc src_type,
                        int64_t src_xstride, int64_t src_ystride,
                        int64_t src_zstride, rust::Slice<uint8_t> dst,
                        TypeDesc dst_type, int64_t dst_xstride,
@@ -460,12 +458,12 @@ add_dither(int nchannels, int width, int height, int depth, float* data,
 
 void
 premult(int nchannels, int width, int height, int depth, int chbegin, int chend,
-        TypeDesc datatype, const rust::Slice<uint8_t> data, int64_t xstride,
+        TypeDesc datatype, rust::Slice<uint8_t> data, int64_t xstride,
         int64_t ystride, int64_t zstride, int alpha_channel, int z_channel);
 
 bool
 copy_image(int nchannels, int width, int height, int depth,
-           const rust::Slice<uint8_t> src, int64_t pixelsize,
+           rust::Slice<const uint8_t> src, int64_t pixelsize,
            int64_t src_xstride, int64_t src_ystride, int64_t src_zstride,
            rust::Slice<uint8_t> dst, int64_t dst_xstride, int64_t dst_ystride,
            int64_t dst_zstride);

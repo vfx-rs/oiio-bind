@@ -42,6 +42,7 @@ mod ffi {
         type IOProxy = crate::filesystem::IOProxy;
         type ROI = crate::imageio::ROI;
         type TypeDesc = crate::typedesc::TypeDesc;
+        type ImageBuf = crate::imagebuf::ImageBuf;
 
         // ROI
         pub fn roi_default() -> ROI;
@@ -128,7 +129,7 @@ mod ffi {
             imageinput: Pin<&mut ImageInput>,
             subimage: i32,
             miplevel: i32,
-        ) -> UniquePtr<ImageSpec>;
+        ) -> &ImageSpec;
         pub fn imageinput_close(imageinput: Pin<&mut ImageInput>) -> bool;
         pub fn imageinput_current_subimage(imageinput: &ImageInput) -> i32;
         pub fn imageinput_current_miplevel(imageinput: &ImageInput) -> i32;
@@ -141,7 +142,7 @@ mod ffi {
             imageinput: Pin<&mut ImageInput>,
             y: i32,
             z: i32,
-            format: &TypeDesc,
+            format: TypeDesc,
             data: &mut [u8],
             xstride: i64,
         ) -> bool;
@@ -155,7 +156,7 @@ mod ffi {
             z: i32,
             chbegin: i32,
             chend: i32,
-            format: &TypeDesc,
+            format: TypeDesc,
             data: &mut [u8],
             xstride: i64,
             ystride: i64,
@@ -167,7 +168,7 @@ mod ffi {
             miplevel: i32,
             chbegin: i32,
             chend: i32,
-            format: &TypeDesc,
+            format: TypeDesc,
             data: &mut [u8],
             xstride: i64,
             ystride: i64,
@@ -306,8 +307,270 @@ mod ffi {
 
         pub fn imageoutput_close(imageoutput: Pin<&mut ImageOutput>) -> bool;
 
+        pub fn imageoutput_write_scanline(
+            imageoutput: Pin<&mut ImageOutput>,
+            y: i32,
+            z: i32,
+            format: TypeDesc,
+            data: &mut [u8],
+            xstride: i64,
+        ) -> bool;
+
+        pub fn imageoutput_write_scanlines(
+            imageoutput: Pin<&mut ImageOutput>,
+            ybegin: i32,
+            yend: i32,
+            z: i32,
+            format: TypeDesc,
+            data: &mut [u8],
+            xstride: i64,
+            ystride: i64,
+        ) -> bool;
+
+        pub fn imageoutput_write_tile(
+            imageoutput: Pin<&mut ImageOutput>,
+            x: i32,
+            y: i32,
+            z: i32,
+            format: TypeDesc,
+            data: &mut [u8],
+            xstride: i64,
+            ystride: i64,
+            zstride: i64,
+        ) -> bool;
+
+        pub fn imageoutput_write_tiles(
+            imageoutput: Pin<&mut ImageOutput>,
+            xbegin: i32,
+            xend: i32,
+            ybegin: i32,
+            yend: i32,
+            zbegin: i32,
+            zend: i32,
+            format: TypeDesc,
+            data: &mut [u8],
+            xstride: i64,
+            ystride: i64,
+            zstride: i64,
+        ) -> bool;
+
+        pub fn imageoutput_write_rectangle(
+            imageoutput: Pin<&mut ImageOutput>,
+            xbegin: i32,
+            xend: i32,
+            ybegin: i32,
+            yend: i32,
+            zbegin: i32,
+            zend: i32,
+            format: TypeDesc,
+            data: &mut [u8],
+            xstride: i64,
+            ystride: i64,
+            zstride: i64,
+        ) -> bool;
+
+        pub fn imageoutput_write_image(
+            imageoutput: Pin<&mut ImageOutput>,
+            format: TypeDesc,
+            data: &mut [u8],
+            xstride: i64,
+            ystride: i64,
+            zstride: i64,
+        ) -> bool;
+
+        pub fn imageoutput_write_deep_scanlines(
+            imageoutput: Pin<&mut ImageOutput>,
+            ybegin: i32,
+            yend: i32,
+            z: i32,
+            data: &DeepData,
+        ) -> bool;
+
+        pub fn imageoutput_write_deep_tiles(
+            imageoutput: Pin<&mut ImageOutput>,
+            xbegin: i32,
+            xend: i32,
+            ybegin: i32,
+            yend: i32,
+            zbegin: i32,
+            zend: i32,
+            data: &DeepData,
+        ) -> bool;
+
+        pub fn imageoutput_write_deep_image(
+            imageoutput: Pin<&mut ImageOutput>,
+            data: &DeepData,
+        ) -> bool;
+
+        pub fn imageoutput_set_thumbnail(
+            imageoutput: Pin<&mut ImageOutput>,
+            thumb: &ImageBuf,
+        ) -> bool;
+
+        pub unsafe fn imageoutput_copy_image(
+            imageoutput: Pin<&mut ImageOutput>,
+            imageinput: *mut ImageInput,
+        ) -> bool;
+
+        pub unsafe fn imageoutput_set_ioproxy(
+            imageoutput: Pin<&mut ImageOutput>,
+            ioproxy: *mut IOProxy,
+        ) -> bool;
+
+        pub fn imageoutput_has_error(imageoutput: &ImageOutput) -> bool;
+
+        pub fn imageoutput_geterror(imageoutput: &ImageOutput, clear: bool) -> String;
+
+        pub fn imageoutput_seterror(imageoutput: Pin<&mut ImageOutput>, message: &str);
+
+        pub fn imageoutput_set_threads(imageoutput: Pin<&mut ImageOutput>, n: i32);
+
+        pub fn imageoutput_threads(imageoutput: &ImageOutput) -> i32;
+
+        pub fn shutdown();
+
+        pub fn openimageio_version() -> i32;
+
         pub fn has_error() -> bool;
 
         pub fn get_error(clear: bool) -> String;
+
+        pub fn attribute(name: &str, type_: TypeDesc, value: &mut [u8]) -> bool;
+
+        pub fn attribute_float(name: &str, value: f32) -> bool;
+
+        pub fn attribute_int(name: &str, value: i32) -> bool;
+
+        pub fn getattribute(name: &str, type_: TypeDesc, value: &mut [u8]) -> bool;
+
+        pub fn getattribute_int(name: &str, value: &mut i32) -> bool;
+
+        pub fn getattribute_float(name: &str, value: &mut f32) -> bool;
+
+        pub fn getattribute_string(name: &str, value: &mut String) -> bool;
+
+        pub fn get_int_attribute(name: &str, defaultval: i32) -> i32;
+
+        pub fn get_float_attribute(name: &str, defaultval: f32) -> f32;
+
+        pub fn get_string_attribute(name: &str, defaultval: &str) -> String;
+
+        // pub unsafe fn declare_imageio_format(
+        //     name: &str,
+        //     input_creator: fn() -> *mut ImageInput,
+        //     input_extensions: &[&str],
+        //     output_creator: fn() -> *mut ImageOutput,
+        //     output_extensions: &[&str],
+        //     lib_version: &str,
+        // );
+
+        pub fn is_imageio_format_name(name: &str) -> bool;
+
+        pub fn get_extension_map() -> Vec<ExtensionMapItem>;
+
+        pub fn convert_pixel_values(
+            src_type: TypeDesc,
+            src: &[u8],
+            dst_type: TypeDesc,
+            dst: &mut [u8],
+        ) -> bool;
+
+        pub fn convert_image(
+            nchannels: i32,
+            width: i32,
+            height: i32,
+            depth: i32,
+            src: &[u8],
+            src_type: TypeDesc,
+            src_xstride: i64,
+            src_ystride: i64,
+            src_zstride: i64,
+            dst: &mut [u8],
+            dst_type: TypeDesc,
+            dst_xstride: i64,
+            dst_ystride: i64,
+            dst_zstride: i64,
+        ) -> bool;
+
+        pub fn parallel_convert_image(
+            nchannels: i32,
+            width: i32,
+            height: i32,
+            depth: i32,
+            src: &[u8],
+            src_type: TypeDesc,
+            src_xstride: i64,
+            src_ystride: i64,
+            src_zstride: i64,
+            dst: &mut [u8],
+            dst_type: TypeDesc,
+            dst_xstride: i64,
+            dst_ystride: i64,
+            dst_zstride: i64,
+            nthreads: i32,
+        ) -> bool;
+
+        pub unsafe fn add_dither(
+            nchannels: i32,
+            width: i32,
+            height: i32,
+            depth: i32,
+            data: *mut f32,
+            xstride: i64,
+            ystride: i64,
+            zstride: i64,
+            ditheramplitude: f32,
+            alpha_channel: i32,
+            z_channel: i32,
+            ditherseed: u32,
+            chorigin: i32,
+            xorigin: i32,
+            yorigin: i32,
+            zorigin: i32,
+        );
+
+        pub fn premult(
+            nchannels: i32,
+            width: i32,
+            height: i32,
+            depth: i32,
+            chbegin: i32,
+            chend: i32,
+            datatype: TypeDesc,
+            data: &mut [u8],
+            xstride: i64,
+            ystride: i64,
+            zstride: i64,
+            alpha_channel: i32,
+            z_channel: i32,
+        );
+
+        pub fn copy_image(
+            nchannels: i32,
+            width: i32,
+            height: i32,
+            depth: i32,
+            src: &[u8],
+            pixelsize: i64,
+            src_xstride: i64,
+            src_ystride: i64,
+            src_zstride: i64,
+            dst: &mut [u8],
+            dst_xstride: i64,
+            dst_ystride: i64,
+            dst_zstride: i64,
+        ) -> bool;
+
+        pub fn wrap_black(coord: &mut i32, origin: i32, width: i32) -> bool;
+
+        pub fn wrap_clamp(coord: &mut i32, origin: i32, width: i32) -> bool;
+
+        pub fn wrap_periodic(coord: &mut i32, origin: i32, width: i32) -> bool;
+
+        pub fn wrap_periodic_pow2(coord: &mut i32, origin: i32, width: i32) -> bool;
+
+        pub fn wrap_mirror(coord: &mut i32, origin: i32, width: i32) -> bool;
+
+        pub fn debug(message: &str);
     }
 }
