@@ -14,21 +14,21 @@ enum class VecSemantics : uint8_t;
 
 // TypeDesc
 
-std::unique_ptr<TypeDesc>
+TypeDesc
 typedesc_new(BaseType basetype, Aggregate aggregate, VecSemantics vecsemantics,
              int arraylen);
 
-std::unique_ptr<TypeDesc>
+TypeDesc
 typedesc_from_basetype_arraylen(BaseType basetype, int arraylen);
 
-std::unique_ptr<TypeDesc>
+TypeDesc
 typedesc_from_basetype_aggregate_arraylen(BaseType basetype,
                                           Aggregate aggregate, int arraylen);
 
-std::unique_ptr<TypeDesc>
+TypeDesc
 typedesc_from_typestring(rust::Str typestring);
 
-std::unique_ptr<TypeDesc>
+TypeDesc
 typedesc_clone(const TypeDesc& typedesc);
 
 rust::Str
@@ -64,7 +64,7 @@ typedesc_is_sized_array(const TypeDesc& typedesc);
 size_t
 typedesc_size(const TypeDesc& typedesc);
 
-std::unique_ptr<TypeDesc>
+TypeDesc
 typedesc_elementtype(const TypeDesc& typedesc);
 
 size_t

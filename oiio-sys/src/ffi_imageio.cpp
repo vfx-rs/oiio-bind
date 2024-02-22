@@ -1,4 +1,5 @@
 #include "ffi_imageio.h"
+#include "oiio-sys/src/imageio.rs.h"
 #include <OpenImageIO/imageio.h>
 #include <OpenImageIO/string_view.h>
 #include <memory>
@@ -6,19 +7,6 @@
 #include <stdio.h>
 
 namespace oiio {
-#pragma region Utility
-bool
-has_error()
-{
-    return OIIO::has_error();
-}
-
-rust::String
-get_error(bool clear) {
-    return OIIO::geterror(clear);
-}
-#pragma endregion
-
 #pragma region ROI
 ROI
 roi_default() noexcept
@@ -266,33 +254,6 @@ imageinput_open_without_config(const rust::Str filename)
     return image_input;
 }
 
-std::unique_ptr<ImageSpec>
-imageinput_open_newspec_with_config(ImageInput& imageinput,
-                                    const rust::Str filename,
-                                    const ImageSpec& config)
-{
-    std::unique_ptr<ImageSpec> newspec(new ImageSpec());
-
-    if (!imageinput.open(std::string(filename), *newspec, config)) {
-        throw std::runtime_error(imageinput.geterror());
-    }
-
-    return newspec;
-}
-
-std::unique_ptr<ImageSpec>
-imageinput_open_newspec_without_config(ImageInput& imageinput,
-                                       const rust::Str filename)
-{
-    std::unique_ptr<ImageSpec> newspec(new ImageSpec());
-
-    if (!imageinput.open(std::string(filename), *newspec)) {
-        throw std::runtime_error(imageinput.geterror());
-    }
-
-    return newspec;
-}
-
 std::unique_ptr<ImageInput>
 imageinput_create_with_config(const rust::Str filename, bool do_open,
                               const ImageSpec& config,
@@ -361,29 +322,24 @@ imageinput_spec(OIIO::ImageInput& imageinput)
     return rust::String(err);
 }
 
-std::unique_ptr<ImageSpec>
+const ImageSpec&
 imageinput_spec(const OIIO::ImageInput& imageinput)
 {
-    ImageSpec spec = static_cast<ImageSpec>(imageinput.spec());
-    return std::unique_ptr<ImageSpec>(new ImageSpec(spec));
+    return imageinput.spec();
 }
 
-std::unique_ptr<ImageSpec>
+const ImageSpec&
 imageinput_spec_subimage_miplevel(OIIO::ImageInput& imageinput,
                                   int32_t subimage, int32_t miplevel)
 {
-    ImageSpec spec = static_cast<ImageSpec>(
-        imageinput.spec(subimage, miplevel));
-    return std::unique_ptr<ImageSpec>(new ImageSpec(spec));
+    return imageinput.spec(subimage, miplevel);
 }
 
-std::unique_ptr<ImageSpec>
+const ImageSpec&
 imageinput_spec_dimensions(OIIO::ImageInput& imageinput, int32_t subimage,
                            int32_t miplevel)
 {
-    ImageSpec spec = static_cast<ImageSpec>(
-        imageinput.spec_dimensions(subimage, miplevel));
-    return std::unique_ptr<ImageSpec>(new ImageSpec(spec));
+    return imageinput.spec_dimensions(subimage, miplevel);
 }
 
 bool
@@ -411,9 +367,8 @@ imageinput_seek_subimage(ImageInput& imageinput, int subimage, int miplevel)
 }
 
 bool
-imageinput_read_scanline(ImageInput& imageinput, int y, int z,
-                         const TypeDesc& format, rust::Slice<uint8_t> data,
-                         int64_t xstride)
+imageinput_read_scanline(ImageInput& imageinput, int y, int z, TypeDesc format,
+                         rust::Slice<uint8_t> data, int64_t xstride)
 {
     return imageinput.read_scanline(y, z, format, data.data(), xstride);
 }
@@ -421,7 +376,7 @@ imageinput_read_scanline(ImageInput& imageinput, int y, int z,
 bool
 imageinput_read_scanlines(ImageInput& imageinput, int subimage, int miplevel,
                           int ybegin, int yend, int z, int chbegin, int chend,
-                          const TypeDesc& format, rust::Slice<uint8_t> data,
+                          TypeDesc format, rust::Slice<uint8_t> data,
                           int64_t xstride, int64_t ystride)
 {
     return imageinput.read_scanlines(subimage, miplevel, ybegin, yend, z,
@@ -431,7 +386,7 @@ imageinput_read_scanlines(ImageInput& imageinput, int subimage, int miplevel,
 
 bool
 imageinput_read_image(ImageInput& imageinput, int subimage, int miplevel,
-                      int chbegin, int chend, const TypeDesc& format,
+                      int chbegin, int chend, TypeDesc format,
                       rust::Slice<uint8_t> data, int64_t xstride,
                       int64_t ystride, int64_t zstride)
 {
@@ -517,6 +472,12 @@ imageinput_geterror(const ImageInput& imageinput, bool clear)
 }
 
 void
+imageinput_seterror(ImageInput& imageinput, const rust::Str message)
+{
+    imageinput.errorfmt(message.data());
+}
+
+void
 imageinput_set_threads(ImageInput& imageinput, int n)
 {
     return imageinput.threads(n);
@@ -526,6 +487,461 @@ int
 imageinput_threads(const ImageInput& imageinput)
 {
     return imageinput.threads();
+}
+#pragma endregion
+
+#pragma region ImageOutput
+std::unique_ptr<ImageOutput>
+imageoutput_create(const rust::Str filename, IOProxy* ioproxy,
+                   const rust::Str plugin_searchpath)
+{
+    OIIO::string_view c_filename(filename.data(), filename.size());
+    OIIO::string_view c_plugin_searchpath(plugin_searchpath.data(),
+                                          plugin_searchpath.size());
+    return ImageOutput::create(c_filename, ioproxy, c_plugin_searchpath);
+}
+
+rust::Str
+imageoutput_format_name(const ImageOutput& imageoutput)
+{
+    return imageoutput.format_name();
+}
+
+int
+imageoutput_supports(const ImageOutput& imageoutput, const rust::Str feature)
+{
+    return imageoutput.supports(
+        OIIO::string_view(feature.data(), feature.size()));
+}
+
+bool
+imageoutput_open(ImageOutput& imageoutput, const rust::Str filename,
+                 const ImageSpec& newspec, OpenMode mode)
+{
+    return imageoutput.open(std::string(filename), newspec, mode);
+}
+
+bool
+imageoutput_open_multi_subimage(ImageOutput& imageoutput,
+                                const rust::Str filename, int subimages,
+                                const ImageSpec* specs)
+{
+    return imageoutput.open(std::string(filename), subimages, specs);
+}
+
+const ImageSpec&
+imageoutput_spec(const ImageOutput& imageoutput)
+{
+    return imageoutput.spec();
+}
+
+bool
+imageoutput_close(ImageOutput& imageoutput)
+{
+    return imageoutput.close();
+}
+
+bool
+imageoutput_write_scanline(ImageOutput& imageoutput, int y, int z,
+                           TypeDesc format, const rust::Slice<uint8_t> data,
+                           int64_t xstride)
+{
+    return imageoutput.write_scanline(y, z, format, data.data(), xstride);
+}
+
+bool
+imageoutput_write_scanlines(ImageOutput& imageoutput, int ybegin, int yend,
+                            int z, TypeDesc format,
+                            const rust::Slice<uint8_t> data, int64_t xstride,
+                            int64_t ystride)
+{
+    return imageoutput.write_scanlines(ybegin, yend, z, format, data.data(),
+                                       xstride, ystride);
+}
+
+bool
+imageoutput_write_tile(ImageOutput& imageoutput, int x, int y, int z,
+                       TypeDesc format, const rust::Slice<uint8_t> data,
+                       int64_t xstride, int64_t ystride, int64_t zstride)
+{
+    return imageoutput.write_tile(x, y, z, format, data.data(), xstride,
+                                  ystride, zstride);
+}
+
+bool
+imageoutput_write_tiles(ImageOutput& imageoutput, int xbegin, int xend,
+                        int ybegin, int yend, int zbegin, int zend,
+                        TypeDesc format, const rust::Slice<uint8_t> data,
+                        int64_t xstride, int64_t ystride, int64_t zstride)
+{
+    return imageoutput.write_tiles(xbegin, xend, ybegin, yend, zbegin, zend,
+                                   format, data.data(), xstride, ystride,
+                                   zstride);
+}
+
+bool
+imageoutput_write_rectangle(ImageOutput& imageoutput, int xbegin, int xend,
+                            int ybegin, int yend, int zbegin, int zend,
+                            TypeDesc format, const rust::Slice<uint8_t> data,
+                            int64_t xstride, int64_t ystride, int64_t zstride)
+{
+    return imageoutput.write_rectangle(xbegin, xend, ybegin, yend, zbegin, zend,
+                                       format, data.data(), xstride, ystride,
+                                       zstride);
+}
+
+bool
+imageoutput_write_image(ImageOutput& imageoutput, TypeDesc format,
+                        const rust::Slice<uint8_t> data, int64_t xstride,
+                        int64_t ystride, int64_t zstride)
+{
+    return imageoutput.write_image(format, data.data(), xstride, ystride,
+                                   zstride);
+}
+
+bool
+imageoutput_write_deep_scanlines(ImageOutput& imageoutput, int ybegin, int yend,
+                                 int z, const DeepData& deepdata)
+{
+    return imageoutput.write_deep_scanlines(ybegin, yend, z, deepdata);
+}
+
+bool
+imageoutput_write_deep_tiles(ImageOutput& imageoutput, int xbegin, int xend,
+                             int ybegin, int yend, int zbegin, int zend,
+                             const DeepData& deepdata)
+{
+    return imageoutput.write_deep_tiles(xbegin, xend, ybegin, yend, zbegin,
+                                        zend, deepdata);
+}
+
+bool
+imageoutput_write_deep_image(ImageOutput& imageoutput, const DeepData& deepdata)
+{
+    return imageoutput.write_deep_image(deepdata);
+}
+
+bool
+imageoutput_set_thumbnail(ImageOutput& imageoutput, const ImageBuf& thumb)
+{
+    return imageoutput.set_thumbnail(thumb);
+}
+
+bool
+imageoutput_copy_image(ImageOutput& imageoutput, ImageInput* imageinput)
+{
+    return imageoutput.copy_image(imageinput);
+}
+
+bool
+imageoutput_set_ioproxy(ImageOutput& imageoutput, IOProxy* ioproxy)
+{
+    return imageoutput.set_ioproxy(ioproxy);
+}
+
+bool
+imageoutput_has_error(const ImageOutput& imageoutput)
+{
+    return imageoutput.has_error();
+}
+
+rust::String
+imageoutput_geterror(const ImageOutput& imageoutput, bool clear)
+{
+    return rust::String(imageoutput.geterror(clear));
+}
+
+void
+imageoutput_seterror(ImageOutput& imageoutput, const rust::Str message)
+{
+    imageoutput.errorfmt(message.data());
+}
+
+void
+imageoutput_set_threads(ImageOutput& imageoutput, int n)
+{
+    imageoutput.threads(n);
+}
+
+int
+imageoutput_threads(const ImageOutput& imageoutput)
+{
+    return imageoutput.threads();
+}
+#pragma endregion
+
+#pragma region Utility Functions
+void
+shutdown()
+{
+    OIIO::shutdown();
+}
+
+int
+openimageio_version()
+{
+    return OIIO::openimageio_version();
+}
+
+bool
+has_error()
+{
+    return OIIO::has_error();
+}
+
+rust::String
+get_error(bool clear)
+{
+    return OIIO::geterror(clear);
+}
+
+bool
+attribute(const rust::Str name, TypeDesc type, rust::Slice<uint8_t> value)
+{
+    return OIIO::attribute(std::string_view(name.data(), name.length()), type,
+                           value.data());
+}
+
+bool
+attribute_float(const rust::Str name, float value)
+{
+    return OIIO::attribute(std::string_view(name.data(), name.length()), value);
+}
+
+bool
+attribute_int(const rust::Str name, const int value)
+{
+    return OIIO::attribute(std::string_view(name.data(), name.length()), value);
+}
+
+bool
+getattribute(const rust::Str name, const TypeDesc type,
+             rust::Slice<uint8_t> value)
+{
+    return OIIO::getattribute(std::string_view(name.data(), name.length()),
+                              type, value.data());
+}
+
+bool
+getattribute_int(const rust::Str name, int& value)
+{
+    return OIIO::getattribute(std::string_view(name.data(), name.length()),
+                              value);
+}
+
+bool
+getattribute_float(const rust::Str name, float& value)
+{
+    {
+        return OIIO::getattribute(std::string_view(name.data(), name.length()),
+                                  value);
+    }
+}
+
+bool
+getattribute_string(const rust::Str name, rust::String& value)
+{
+    std::string c_value;
+    bool result
+        = OIIO::getattribute(std::string_view(name.data(), name.length()),
+                             c_value);
+    value = rust::String(c_value);
+    return result;
+}
+
+int
+get_int_attribute(const rust::Str name, int defaultval)
+{
+    return OIIO::get_int_attribute(std::string_view(name.data(), name.length()),
+                                   defaultval);
+}
+
+float
+get_float_attribute(const rust::Str name, float defaultval)
+{
+    return OIIO::get_float_attribute(std::string_view(name.data(),
+                                                      name.length()),
+                                     defaultval);
+}
+
+rust::String
+get_string_attribute(const rust::Str name, const rust::Str defaultval)
+{
+    std::string c_defaultval(defaultval.data(), defaultval.length());
+    std::string c_value = OIIO::get_string_attribute(
+        std::string_view(name.data(), name.length()), c_defaultval);
+    return rust::String(c_value);
+}
+
+// void
+// declare_imageio_format(const rust::Str name,
+//                        rust::Fn<ImageInput*(ImageInput*)> input_creator,
+//                        const rust::Slice<const rust::Str> input_extensions,
+//                        rust::Fn<ImageOutput*(ImageOutput*)> output_creator,
+//                        const rust::Slice<const rust::Str> output_extensions,
+//                        const rust::Str lib_version)
+// {
+//     auto c_input_creator = [&](OIIO::ImageInput*) -> OIIO::ImageInput* {
+//         return input_creator();
+//     };
+
+//     std::vector<const char*> c_input_extensions;
+//     c_input_extensions.reserve(input_extensions.size() + 1);
+//     std::vector<const char*> c_output_extensions;
+//     c_output_extensions.reserve(output_extensions.size() + 1);
+//     std::string c_name(name.data(), name.length());
+//     std::string c_lib_version(lib_version.data(), lib_version.length());
+
+//     for (auto& ext : input_extensions) {
+//         c_input_extensions.push_back(ext.data());
+//     }
+//     c_input_extensions.push_back(nullptr);
+
+//     for (auto& ext : output_extensions) {
+//         c_output_extensions.push_back(ext.data());
+//     }
+//     c_output_extensions.push_back(nullptr);
+
+//     OIIO::declare_imageio_format(c_name, c_input_creator,
+//                                  c_input_extensions.data(),
+//                                  (ImageOutput::Creator)(&output_creator),
+//                                  c_output_extensions.data(),
+//                                  c_lib_version.data());
+// }
+
+bool
+is_imageio_format_name(const rust::Str name)
+{
+    return OIIO::is_imageio_format_name(std::string(name));
+}
+
+rust::Vec<ExtensionMapItem>
+get_extension_map()
+{
+    auto map = OIIO::get_extension_map();
+    rust::Vec<ExtensionMapItem> result;
+
+    for (auto& item : map) {
+        ExtensionMapItem i {};
+        rust::Vec<rust::String> values {};
+
+        for (auto& value : item.second) {
+            values.push_back(rust::String(value));
+        }
+
+        i.key   = rust::String(item.first);
+        i.value = values;
+        result.push_back(i);
+    }
+
+    return result;
+}
+
+
+bool
+convert_pixel_values(TypeDesc src_type, rust::Slice<const uint8_t> src,
+                     TypeDesc dst_type, rust::Slice<uint8_t> dst)
+{
+    return OIIO::convert_pixel_values(src_type, src.data(), dst_type,
+                                      dst.data());
+}
+
+bool
+convert_image(int nchannels, int width, int height, int depth,
+              rust::Slice<const uint8_t> src, TypeDesc src_type,
+              int64_t src_xstride, int64_t src_ystride, int64_t src_zstride,
+              rust::Slice<uint8_t> dst, TypeDesc dst_type, int64_t dst_xstride,
+              int64_t dst_ystride, int64_t dst_zstride)
+{
+    return OIIO::convert_image(nchannels, width, height, depth, src.data(),
+                               src_type, src_xstride, src_ystride, src_zstride,
+                               dst.data(), dst_type, dst_xstride, dst_ystride,
+                               dst_zstride);
+}
+
+bool
+parallel_convert_image(int nchannels, int width, int height, int depth,
+                       rust::Slice<const uint8_t> src, TypeDesc src_type,
+                       int64_t src_xstride, int64_t src_ystride,
+                       int64_t src_zstride, rust::Slice<uint8_t> dst,
+                       TypeDesc dst_type, int64_t dst_xstride,
+                       int64_t dst_ystride, int64_t dst_zstride, int nthreads)
+{
+    return OIIO::parallel_convert_image(nchannels, width, height, depth,
+                                        src.data(), src_type, src_xstride,
+                                        src_ystride, src_zstride, dst.data(),
+                                        dst_type, dst_xstride, dst_ystride,
+                                        dst_zstride, nthreads);
+}
+
+void
+add_dither(int nchannels, int width, int height, int depth, float* data,
+           int64_t xstride, int64_t ystride, int64_t zstride,
+           float ditheramplitude, int alpha_channel, int z_channel,
+           unsigned int ditherseed, int chorigin, int xorigin, int yorigin,
+           int zorigin)
+{
+    OIIO::add_dither(nchannels, width, height, depth, data, xstride, ystride,
+                     zstride, ditheramplitude, alpha_channel, z_channel,
+                     ditherseed, chorigin, xorigin, yorigin, zorigin);
+}
+
+void
+premult(int nchannels, int width, int height, int depth, int chbegin, int chend,
+        TypeDesc datatype, rust::Slice<uint8_t> data, int64_t xstride,
+        int64_t ystride, int64_t zstride, int alpha_channel, int z_channel)
+{
+    OIIO::premult(nchannels, width, height, depth, chbegin, chend, datatype,
+                  data.data(), xstride, ystride, zstride, alpha_channel,
+                  z_channel);
+}
+
+bool
+copy_image(int nchannels, int width, int height, int depth,
+           rust::Slice<const uint8_t> src, int64_t pixelsize,
+           int64_t src_xstride, int64_t src_ystride, int64_t src_zstride,
+           rust::Slice<uint8_t> dst, int64_t dst_xstride, int64_t dst_ystride,
+           int64_t dst_zstride)
+{
+    return OIIO::copy_image(nchannels, width, height, depth, src.data(),
+                            pixelsize, src_xstride, src_ystride, src_zstride,
+                            dst.data(), dst_xstride, dst_ystride, dst_zstride);
+}
+
+bool
+wrap_black(int& coord, int origin, int width)
+{
+    return OIIO::wrap_black(coord, origin, width);
+}
+
+bool
+wrap_clamp(int& coord, int origin, int width)
+{
+    return OIIO::wrap_clamp(coord, origin, width);
+}
+
+bool
+wrap_periodic(int& coord, int origin, int width)
+{
+    return OIIO::wrap_periodic(coord, origin, width);
+}
+
+bool
+wrap_periodic_pow2(int& coord, int origin, int width)
+{
+    return OIIO::wrap_periodic_pow2(coord, origin, width);
+}
+
+bool
+wrap_mirror(int& coord, int origin, int width)
+{
+    return OIIO::wrap_mirror(coord, origin, width);
+}
+
+void
+debug(const rust::Str message)
+{
+    OIIO::debug(message.data());
 }
 #pragma endregion
 }  // namespace oiio

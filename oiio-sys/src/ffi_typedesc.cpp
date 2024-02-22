@@ -8,54 +8,42 @@
 
 namespace oiio {
 #pragma region TypeDesc
-std::unique_ptr<TypeDesc>
+TypeDesc
 typedesc_new(BaseType basetype, Aggregate aggregate, VecSemantics vecsemantics,
              int arraylen)
 {
-    OIIO::TypeDesc* typedesc
-        = new OIIO::TypeDesc(static_cast<TypeDesc::BASETYPE>(basetype),
-                             static_cast<TypeDesc::AGGREGATE>(aggregate),
-                             static_cast<TypeDesc::VECSEMANTICS>(vecsemantics),
-                             arraylen);
-
-    return std::unique_ptr<OIIO::TypeDesc>(typedesc);
+    return OIIO::TypeDesc(static_cast<TypeDesc::BASETYPE>(basetype),
+                          static_cast<TypeDesc::AGGREGATE>(aggregate),
+                          static_cast<TypeDesc::VECSEMANTICS>(vecsemantics),
+                          arraylen);
 }
 
-std::unique_ptr<TypeDesc>
+TypeDesc
 typedesc_from_basetype_arraylen(BaseType basetype, int arraylen)
 {
-    OIIO::TypeDesc* typedesc
-        = new OIIO::TypeDesc(static_cast<TypeDesc::BASETYPE>(basetype),
-                             arraylen);
-
-    return std::unique_ptr<OIIO::TypeDesc>(typedesc);
+    return OIIO::TypeDesc(static_cast<TypeDesc::BASETYPE>(basetype), arraylen);
 }
 
-std::unique_ptr<TypeDesc>
+TypeDesc
 typedesc_from_basetype_aggregate_arraylen(BaseType basetype,
                                           Aggregate aggregate, int arraylen)
 {
-    OIIO::TypeDesc* typedesc
-        = new OIIO::TypeDesc(static_cast<TypeDesc::BASETYPE>(basetype),
-                             static_cast<TypeDesc::AGGREGATE>(aggregate),
-                             arraylen);
-
-    return std::unique_ptr<OIIO::TypeDesc>(typedesc);
+    return OIIO::TypeDesc(static_cast<TypeDesc::BASETYPE>(basetype),
+                          static_cast<TypeDesc::AGGREGATE>(aggregate),
+                          arraylen);
 }
 
-std::unique_ptr<TypeDesc>
+TypeDesc
 typedesc_from_typestring(rust::Str typestring)
 {
     OIIO::string_view typestring_view(typestring.data(), typestring.size());
-    OIIO::TypeDesc* typedesc = new OIIO::TypeDesc(typestring_view);
-
-    return std::unique_ptr<OIIO::TypeDesc>(typedesc);
+    return OIIO::TypeDesc(typestring_view);
 }
 
-std::unique_ptr<TypeDesc>
+TypeDesc
 typedesc_clone(const TypeDesc& typedesc)
 {
-    return std::unique_ptr<OIIO::TypeDesc>(new OIIO::TypeDesc(typedesc));
+    return OIIO::TypeDesc(typedesc);
 }
 
 rust::Str
@@ -124,11 +112,10 @@ typedesc_size(const TypeDesc& typedesc)
     return typedesc.size();
 }
 
-std::unique_ptr<TypeDesc>
+TypeDesc
 typedesc_elementtype(const TypeDesc& typedesc)
 {
-    OIIO::TypeDesc* typedesc_ptr = new OIIO::TypeDesc(typedesc.elementtype());
-    return std::unique_ptr<OIIO::TypeDesc>(typedesc_ptr);
+    return OIIO::TypeDesc(typedesc.elementtype());
 }
 
 size_t
