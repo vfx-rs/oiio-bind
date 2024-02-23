@@ -289,12 +289,6 @@ imageinput_create_without_config(const rust::Str filename, bool do_open,
     }
 }
 
-void
-imageinput_destroy(ImageInput& imageinput)
-{
-    imageinput.~ImageInput();
-}
-
 rust::Str
 imageinput_format_name(const ImageInput& imageinput)
 {
