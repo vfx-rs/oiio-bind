@@ -21,8 +21,8 @@ cxx = { workspace = true }
 
 [build-dependencies]
 anyhow = { workspace = true }
-cxx-build = "1.0.116"
-pkg-config = "0.3.29"
+cxx-build = "1.0.117"
+pkg-config = "0.3.30"
 
 # The docs are the same across all platforms so we only need to build once.
 [package.metadata.docs.rs]

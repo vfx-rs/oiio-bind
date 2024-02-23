@@ -156,9 +156,6 @@ std::unique_ptr<ImageInput>
 imageinput_create_without_config(const rust::Str filename, bool do_open,
                                  const rust::Str plugin_searchpath);
 
-void
-imageinput_destroy(ImageInput& imageinput);
-
 rust::Str
 imageinput_format_name(const ImageInput& imageinput);
 
