@@ -1,6 +1,13 @@
 use anyhow::Result;
 
-const NAMES: &[&str] = &["typedesc", "imageio", "imagebuf", "deepdata", "filesystem"];
+const NAMES: &[&str] = &[
+    "deepdata",
+    "filesystem",
+    "imagebuf",
+    "imagecache",
+    "imageio",
+    "typedesc",
+];
 
 fn main() -> Result<()> {
     // Skip linking on docs.rs: https://docs.rs/about/builds#detecting-docsrs
